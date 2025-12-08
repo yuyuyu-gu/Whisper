@@ -34,7 +34,7 @@ class FaceSearchService:
     """
     
     def __init__(self, db_dir: str = "face_db", det_size: Tuple[int, int] = (512, 512),
-                 max_faces_per_image: int = 3, flush_batch_size: int = 1024, max_image_side: int = 1600):
+                 max_faces_per_image: int = 10, flush_batch_size: int = 1024, max_image_side: int = 1600):
         """
         初始化人脸搜索服务。
         
