@@ -309,15 +309,22 @@ class App:
                                         files_subtitles = gr.Files(label=_("Downloadable output file"), interactive=False)
                                         btn_openfolder = gr.Button('📂 打开输出目录', scale=1)
 
-                            # 自动化 LLM 纠错配置（隐藏）
-                            state_enable_llm = gr.State(True)
+                                    with gr.Group():
+                                        gr.Markdown("**字幕关键词查找**")
+                                        with gr.Row():
+                                            tb_keyword = gr.Textbox(label="关键词", placeholder="输入要查找的词语", lines=1)
+                                            dd_sub_file = gr.Dropdown(label="选择字幕文件", choices=[], allow_custom_value=True)
+                                        btn_search_keyword = gr.Button("在字幕中查找", variant="secondary")
+                                        tb_search_result = gr.Textbox(
+                                            label="查找结果",
+                                            lines=8,
+                                            interactive=False,
+                                            placeholder="点击“在字幕中查找”后显示包含该词的句子",
+                                        )
+
+                            # 纠错功能关闭，仅输出 Whisper 原始文本
                             state_whisper_hidden = gr.State("")
-                            state_rag_kb_dir = gr.State(self.config.rag_kb_dir)
-                            state_ollama_base_url = gr.State("http://localhost:11434")
-                            state_ollama_model = gr.State("qwen2.5:3b")
-                            state_rag_top_k = gr.State(4)
-                            state_rag_similarity = gr.State(0.85)
-                            state_chat_payload = gr.State(None)
+                            state_sub_paths = gr.State([])
 
                             params = [
                                 input_file,
@@ -327,12 +334,6 @@ class App:
                                 dd_file_format,
                                 cb_timestamp,
                                 cb_convert_t2s,
-                                state_enable_llm,
-                                state_rag_kb_dir,
-                                state_ollama_base_url,
-                                state_ollama_model,
-                                state_rag_top_k,
-                                state_rag_similarity,
                             ]
                             params = params + pipeline_params
 
@@ -347,191 +348,68 @@ class App:
                                     result = list(result)
                                 elif not isinstance(result, list):
                                     result = [result]
-                                result.append(status)
-                                return result
+                                # 预期 result: [whisper_text, subtitle_text, files]
+                                if len(result) < 3:
+                                    result = (result + ["", [], None])[:3]
+                                whisper_text = result[0]
+                                subtitle_text = result[1]
+                                files_out = result[2] or []
+                                file_choices = files_out if isinstance(files_out, list) else []
+                                dd_update = gr.update(choices=file_choices, value=file_choices[0] if file_choices else None)
+                                return whisper_text, subtitle_text, files_out, status, dd_update, file_choices
 
                             btn_run.click(
                                 fn=_submit_transcription_job,
                                 inputs=params,
-                                outputs=[state_whisper_hidden, tb_corrected_output, files_subtitles, state_chat_payload, job_status_md],
+                                outputs=[state_whisper_hidden, tb_corrected_output, files_subtitles, job_status_md, dd_sub_file, state_sub_paths],
                             )
                             btn_openfolder.click(fn=lambda: self.open_folder("outputs"), inputs=None, outputs=None)
 #-------------------------------------------------------------------------------------------------------------
-                        with gr.TabItem(_("访谈助手")):
-                            gr.Markdown("#### 访谈助手 / RAG 临时问答")
-                            gr.Markdown("完成转写后，可在此基于最新字幕与临时上传的文本文档进行问答或总结。未加载文本时自动回退为普通聊天。")
-                            with gr.Row(equal_height=False):
-                                with gr.Column(scale=6, min_width=480):
-                                    chat_history = gr.Chatbot(
-                                        label="对话记录",
-                                        height=420,
-                                        show_copy_button=True,
-                                        show_label=True,
-                                    )
-                                    with gr.Row():
-                                        btn_chat_clear = gr.Button("清空对话", variant="secondary")
-
-                                with gr.Column(scale=4, min_width=360):
-                                    tb_chat_input = gr.Textbox(
-                                        label="提问或指令",
-                                        placeholder="例如：请总结这段访谈的核心观点",
-                                        lines=3,
-                                    )
-                                    slider_chat_top_k = gr.Slider(
-                                        minimum=1,
-                                        maximum=8,
-                                        step=1,
-                                        value=4,
-                                        label="检索片段数量 (top_k)",
-                                    )
-                                    slider_chat_similarity = gr.Slider(
-                                        minimum=0.5,
-                                        maximum=0.95,
-                                        step=0.05,
-                                        value=0.8,
-                                        label="最小相似度阈值",
-                                    )
-                                    btn_chat_send = gr.Button("发送", variant="primary")
-                                    gr.Markdown("完成一次转写后即可使用访谈内容进行问答；若未加载文本，则自动作为普通 AI 回答。")
-                                    with gr.Accordion("上传补充文档（可选）", open=False):
-                                        gr.Markdown("上传 `.txt` / `.md` 文件作为临时上下文，帮助 AI 回答。")
-                                        chat_upload = gr.Files(
-                                            label="选择文本或 Markdown 文件",
-                                            file_types=["file"],
-                                            type="filepath",
-                                        )
-                                        btn_load_chat_docs = gr.Button("载入到访谈助手", variant="secondary")
-                                        chat_upload_feedback = gr.Markdown("")
-                            def _chat_with_transcript(
-                                message: str,
-                                history: Optional[List[List[str]]],
-                                chat_payload: Optional[dict],
-                                top_k: int,
-                                similarity: float,
-                                base_url: Optional[str],
-                                model_name: str,
-                            ):
-                                history = history or []
-                                if not message or not message.strip():
-                                    gr.Warning("请输入问题或指令。")
-                                    return history, ""
-                                try:
-                                    answer, used_context = self.temp_chat_service.generate_reply(
-                                        payload=chat_payload,
-                                        user_message=message.strip(),
-                                        history=history,
-                                        base_url=base_url,
-                                        model=model_name,
-                                        top_k=int(top_k),
-                                        similarity_threshold=float(similarity),
-                                    )
-                                    if not chat_payload:
-                                        gr.Info("未检测到访谈文本，将作为普通 AI 回答。")
-                                    elif not used_context:
-                                        gr.Info("未检索到相关访谈片段，回答基于模型常识。")
-                                    updated_history = history + [[message, answer]]
-                                    return updated_history, ""
-                                except Exception as exc:
-                                    logger.error(f"临时 RAG 对话失败: {exc}", exc_info=True)
-                                    gr.Warning(f"聊天失败：{exc}")
-                                    return history, message
-
-                            def _load_chat_documents(file_list, existing_payload):
-                                if not file_list:
-                                    return existing_payload, "请先选择要上传的文件。"
-                                resolved_paths = []
-                                for item in file_list:
-                                    if isinstance(item, gr.utils.NamedString):
-                                        resolved_paths.append(item.name)
-                                    elif isinstance(item, str):
-                                        resolved_paths.append(item)
-                                    elif hasattr(item, "name"):
-                                        resolved_paths.append(item.name)
-                                if not resolved_paths:
-                                    return existing_payload, "无法解析上传文件路径。"
-
-                                supported_ext = (".txt", ".md", ".markdown")
-                                loaded_entries = []
-                                failures = []
-
-                                def _read_plain_text(path: str) -> Optional[str]:
-                                    encodings = ("utf-8", "utf-8-sig", "gbk")
-                                    for enc in encodings:
-                                        try:
-                                            with open(path, "r", encoding=enc) as f:
-                                                return f.read()
-                                        except UnicodeDecodeError:
+                        # 字幕关键词查找功能
+                        def _search_keyword(keyword: str, file_path: str, stored_paths: list):
+                            keyword = (keyword or "").strip()
+                            if not keyword:
+                                return "请先输入关键词。"
+                            candidate = file_path or ""
+                            if not candidate and stored_paths:
+                                candidate = stored_paths[0]
+                            if not candidate:
+                                return "请先选择或生成字幕文件。"
+                            try:
+                                if not os.path.exists(candidate):
+                                    return f"文件不存在：{candidate}"
+                                lines = []
+                                with open(candidate, "r", encoding="utf-8", errors="ignore") as f:
+                                    for line in f:
+                                        stripped = line.strip()
+                                        if not stripped:
                                             continue
-                                        except Exception as exc:
-                                            logger.warning(f"读取聊天上传文件失败：{path}, {exc}")
-                                            return None
-                                    return None
+                                        if "-->" in stripped:
+                                            continue
+                                        if stripped.isdigit():
+                                            continue
+                                        lines.append(stripped)
+                                if not lines:
+                                    return "未能读取字幕内容。"
+                                kw = keyword.lower()
+                                matched = [ln for ln in lines if kw in ln.lower()]
+                                if not matched:
+                                    return f"未在文件中找到关键词：{keyword}"
+                                preview = "\n".join(matched[:30])
+                                if len(matched) > 30:
+                                    preview += f"\n... 共 {len(matched)} 处匹配，已截断显示前 30 条。"
+                                return preview
+                            except Exception as exc:
+                                logger.error(f"字幕关键词查找失败: {exc}", exc_info=True)
+                                return f"查找失败：{exc}"
 
-                                for path in resolved_paths:
-                                    if not path or not os.path.exists(path):
-                                        failures.append(f"{os.path.basename(path) if path else '未知文件'}：路径不存在")
-                                        continue
-                                    ext = os.path.splitext(path)[1].lower()
-                                    if ext not in supported_ext:
-                                        failures.append(f"{os.path.basename(path)}：不支持的类型（仅限 txt/md）")
-                                        continue
-                                    content = _read_plain_text(path)
-                                    if not content:
-                                        failures.append(f"{os.path.basename(path)}：无法读取内容")
-                                        continue
-                                    loaded_entries.append((os.path.basename(path), content.strip()))
-
-                                if not loaded_entries:
-                                    reason = "；".join(failures[:3]) if failures else "未能读取有效文本。"
-                                    return existing_payload, f"⚠️ 上传失败：{reason}"
-
-                                payload = dict(existing_payload or {})
-                                files_entries = list(payload.get("files") or [])
-                                combined_text_parts = []
-                                if payload.get("combined_text"):
-                                    combined_text_parts.append(payload["combined_text"])
-
-                                for name, text in loaded_entries:
-                                    files_entries.append({"name": name, "text": text, "rag_records": []})
-                                    combined_text_parts.append(f"### {name}\n{text}")
-
-                                payload["files"] = files_entries
-                                payload["combined_text"] = "\n\n".join([part for part in combined_text_parts if part]).strip()
-                                payload.setdefault("created_at", time.time())
-                                if not payload.get("session_id"):
-                                    payload["session_id"] = str(uuid4())
-                                else:
-                                    self.temp_chat_service.clear_session(payload["session_id"])
-
-                                summary = f"✅ 成功载入 {len(loaded_entries)} 个文件。"
-                                if failures:
-                                    summary += f" 以下文件处理失败：{'; '.join(failures[:2])}"
-                                return payload, summary
-
-                            btn_chat_send.click(
-                                fn=_chat_with_transcript,
-                                inputs=[
-                                    tb_chat_input,
-                                    chat_history,
-                                    state_chat_payload,
-                                    slider_chat_top_k,
-                                    slider_chat_similarity,
-                                    state_ollama_base_url,
-                                    state_ollama_model,
-                                ],
-                                outputs=[chat_history, tb_chat_input],
-                            )
-                            btn_load_chat_docs.click(
-                                fn=_load_chat_documents,
-                                inputs=[chat_upload, state_chat_payload],
-                                outputs=[state_chat_payload, chat_upload_feedback]
-                            )
-
-                            btn_chat_clear.click(
-                                fn=lambda: ([], ""),
-                                inputs=None,
-                                outputs=[chat_history, tb_chat_input],
-                            )
+                        btn_search_keyword.click(
+                            fn=_search_keyword,
+                            inputs=[tb_keyword, dd_sub_file, state_sub_paths],
+                            outputs=[tb_search_result],
+                        )
+#-------------------------------------------------------------------------------------------------------------
+                        # 访谈助手（RAG）功能已移除
 
                         # Translation and BGM tabs removed per request
 
@@ -552,6 +430,21 @@ class App:
                                             label="上传人脸图像",
                                             height=240,
                                             show_download_button=False,
+                                        )
+                                        with gr.Row():
+                                            btn_detect_faces = gr.Button("检测人脸", variant="secondary", size="sm")
+                                        img_face_detection = gr.Image(
+                                            type="filepath",
+                                            label="人脸检测结果",
+                                            height=300,
+                                            show_download_button=True,
+                                            visible=False,
+                                        )
+                                        tb_face_info = gr.Textbox(
+                                            label="检测信息",
+                                            interactive=False,
+                                            lines=3,
+                                            visible=False,
                                         )
                                         tb_result_prefix = gr.Textbox(
                                             label="结果重命名前缀（仅管理员可见）",
@@ -690,6 +583,47 @@ class App:
                                     preview += f"... 等 {len(errors)} 项"
                                 summary_parts.append(f"部分图片重命名失败：{preview}")
                             return updated_pairs, "\n".join(summary_parts).strip()
+
+                        def _detect_faces(query_path: str):
+                            """检测图像中的人脸并可视化"""
+                            try:
+                                if not query_path:
+                                    return gr.update(value=None, visible=False), gr.update(value="请先上传图像。", visible=False)
+                                
+                                vis_path, face_count, face_info_list = self.face_search.detect_and_visualize_faces(query_path)
+                                
+                                if vis_path is None:
+                                    return gr.update(value=None, visible=False), gr.update(value="检测失败：无法处理图像。", visible=True)
+                                
+                                if face_count == 0:
+                                    return gr.update(value=None, visible=False), gr.update(value="未检测到人脸。", visible=True)
+                                
+                                # 构建信息文本
+                                info_lines = [f"检测到 {face_count} 张人脸："]
+                                for info in face_info_list:
+                                    idx = info.get("index", 0)
+                                    bbox = info.get("bbox", [])
+                                    conf = info.get("confidence")
+                                    age = info.get("age")
+                                    gender = info.get("gender")
+                                    
+                                    info_parts = [f"人脸 {idx}: 位置({bbox[0]}, {bbox[1]}) - ({bbox[2]}, {bbox[3]})"]
+                                    if conf is not None:
+                                        info_parts.append(f"置信度: {conf:.2f}")
+                                    if age is not None:
+                                        info_parts.append(f"年龄: {age}")
+                                    if gender is not None:
+                                        info_parts.append(f"性别: {gender}")
+                                    info_lines.append(" | ".join(info_parts))
+                                
+                                info_text = "\n".join(info_lines)
+                                return gr.update(value=vis_path, visible=True), gr.update(value=info_text, visible=True)
+                                
+                            except ValueError as e:
+                                return gr.update(value=None, visible=False), gr.update(value=f"检测失败: {str(e)}", visible=True)
+                            except Exception as e:
+                                logger.error(f"人脸检测出错: {e}", exc_info=True)
+                                return gr.update(value=None, visible=False), gr.update(value=f"检测失败: {str(e)}", visible=True)
 
                         def _face_search(query_path: str, top_k: int, max_distance: float):
                             try:
@@ -880,6 +814,11 @@ class App:
                                 logger.error(f"清空数据库失败: {e}", exc_info=True)
                                 return f"清空数据库失败: {str(e)}"
 
+                        btn_detect_faces.click(
+                            fn=_detect_faces,
+                            inputs=[img_query],
+                            outputs=[img_face_detection, tb_face_info]
+                        )
                         btn_search.click(
                             fn=_face_search,
                             inputs=[img_query, num_top_k, max_dist],
