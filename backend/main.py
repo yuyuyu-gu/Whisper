@@ -14,6 +14,8 @@ from backend.routers.vad.router import get_vad_model, vad_router
 from backend.routers.bgm_separation.router import get_bgm_separation_inferencer, bgm_separation_router
 from backend.routers.task.router import task_router
 from backend.routers.auth.router import auth_router
+from backend.routers.face_search.router import face_search_router
+from backend.routers.interview.router import interview_router
 from backend.common.config_loader import read_env, load_server_config
 from backend.common.cache_manager import cleanup_old_files
 from modules.utils.paths import SERVER_CONFIG_PATH, BACKEND_CACHE_DIR
@@ -83,6 +85,8 @@ app.include_router(vad_router)
 app.include_router(bgm_separation_router)
 app.include_router(task_router)
 app.include_router(auth_router)
+app.include_router(face_search_router)
+app.include_router(interview_router)
 
 
 @app.get("/", response_class=RedirectResponse, include_in_schema=False)
