@@ -79,7 +79,25 @@ class BaseParams(BaseModel):
 
     @classmethod
     def from_list(cls, data_list: List) -> 'BaseParams':
+        # 确保字段顺序与 to_list() 一致
+        # to_list() 使用 model_dump().values()，顺序与 model_fields.keys() 一致
+        if not data_list:
+            return cls()
+        # 使用 model_fields 的键顺序（按字段定义顺序）
         field_names = list(cls.model_fields.keys())
+        # 如果数据列表长度不匹配，使用默认值填充或截断
+        if len(data_list) != len(field_names):
+            # 创建默认实例以获取默认值
+            default_instance = cls()
+            defaults = default_instance.model_dump()
+            # 使用提供的值，缺失的用默认值填充
+            values = {}
+            for i, field_name in enumerate(field_names):
+                if i < len(data_list):
+                    values[field_name] = data_list[i]
+                else:
+                    values[field_name] = defaults.get(field_name)
+            return cls(**values)
         return cls(**dict(zip(field_names, data_list)))
 
 
@@ -604,17 +622,58 @@ class TranscriptionPipelineParams(BaseModel):
     def from_list(pipeline_list: List) -> 'TranscriptionPipelineParams':
         """Convert list to the data class again to use it in a function."""
         data_list = deepcopy(pipeline_list)
+        try:
+            from modules.utils.logger import get_logger
+            logger = get_logger()
+        except Exception:
+            logger = None
+        if logger:
+            logger.debug(f"[TranscriptionPipeline] pipeline_list length={len(pipeline_list)} values={pipeline_list}")
+        else:
+            print(f"[TranscriptionPipeline] pipeline_list length={len(pipeline_list)} values={pipeline_list}")
 
-        whisper_list = data_list[0:len(WhisperParams.__annotations__)]
-        data_list = data_list[len(WhisperParams.__annotations__):]
+        # pipeline_list 的结构是: [dd_model, dd_lang, cb_translate] + whisper_inputs + vad_inputs + diarization_inputs + uvr_inputs
+        # 其中 whisper_inputs 是通过 to_gradio_inputs(only_advanced=True) 创建的，不包含前三个基本参数
+        # app.py 在第8个位置（索引8）插入了 tb_initial_prompt_state
+        
+        # 提取前三个基本参数
+        if len(data_list) < 3:
+            raise ValueError(f"pipeline_list 至少需要3个参数 (model_size, lang, is_translate)，但只收到 {len(data_list)} 个")
+        
+        model_size = data_list[0]
+        lang = data_list[1]
+        is_translate = data_list[2]
+        data_list = data_list[3:]
+        
+        # 构建完整的 whisper_list：剩余参数按照字段顺序依次对应
+        whisper_field_names = list(WhisperParams.model_fields.keys())
+        default_whisper = WhisperParams()
+        defaults = default_whisper.model_dump()
+        
+        whisper_list = [model_size, lang, is_translate]
+        whisper_remaining_count = len(whisper_field_names) - 3
+        
+        whisper_values = list(data_list[:whisper_remaining_count])
+        data_list = data_list[whisper_remaining_count:]
+        
+        if len(whisper_values) < whisper_remaining_count:
+            remaining_field_names = whisper_field_names[3 + len(whisper_values):]
+            whisper_values.extend([
+                defaults.get(field_name)
+                for field_name in remaining_field_names
+            ])
+        whisper_list.extend(whisper_values[:whisper_remaining_count])
 
-        vad_list = data_list[0:len(VadParams.__annotations__)]
-        data_list = data_list[len(VadParams.__annotations__):]
+        vad_count = len(VadParams.model_fields)
+        vad_list = data_list[0:vad_count]
+        data_list = data_list[vad_count:]
 
-        diarization_list = data_list[0:len(DiarizationParams.__annotations__)]
-        data_list = data_list[len(DiarizationParams.__annotations__):]
+        diarization_count = len(DiarizationParams.model_fields)
+        diarization_list = data_list[0:diarization_count]
+        data_list = data_list[diarization_count:]
 
-        bgm_sep_list = data_list[0:len(BGMSeparationParams.__annotations__)]
+        bgm_sep_count = len(BGMSeparationParams.model_fields)
+        bgm_sep_list = data_list[0:bgm_sep_count]
 
         return TranscriptionPipelineParams(
             whisper=WhisperParams.from_list(whisper_list),

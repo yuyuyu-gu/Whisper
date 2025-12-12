@@ -85,7 +85,8 @@ class AppContext:
         if self._face_search is None:
             db_dir = os.path.join(self.config.output_dir, "face_db")
             os.makedirs(db_dir, exist_ok=True)
-            self._face_search = FaceSearchService(db_dir=db_dir)
+            # 设置每张图片最多处理100张人脸
+            self._face_search = FaceSearchService(db_dir=db_dir, max_faces_per_image=100)
         return self._face_search
 
 

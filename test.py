@@ -1,4 +1,5 @@
+import onnxruntime as ort
+print("onnxruntime:", ort.__version__)
+print("providers:", ort.get_available_providers())
 import torch
-import torchaudio
-print(f"Torch version: {torch.__version__}")
-print(f"Torchaudio version: {torchaudio.__version__}")
+print(torch.backends.cudnn.version())
