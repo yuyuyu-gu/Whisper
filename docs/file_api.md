@@ -1,5 +1,12 @@
-# Whisper-WebUI REST API 接口文档
-1
+# 文件与任务 / File & Task API 文档
+
+后端 routers：
+
+- 任务查询：`backend/routers/task/router.py`
+- 转写：`backend/routers/transcription/router.py`
+- VAD：`backend/routers/vad/router.py`
+- BGM 分离：`backend/routers/bgm_separation/router.py`
+
 > 本文档基于后端代码（FastAPI）整理，供前端对接使用。
 >
 > 默认后端地址假设为：`http://localhost:8000`（请根据实际部署替换）。

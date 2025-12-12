@@ -1,9 +1,11 @@
-# 后端 REST 接口建议文档（认证）
+# 认证 / Auth API 文档
+
+后端 router：`backend/routers/auth/router.py`
 
 ## 一、认证与用户审批接口（Auth）
 
-- 推荐统一前缀：`/auth`
-- 后端内部实现建议基于 `services/auth/service.py` 中的 `AuthService`。
+- 统一前缀：`/auth`
+- 内部实现基于 `services/auth/service.py` 中的 `AuthService`。
 
 ### 1. 用户注册
 
@@ -230,7 +232,7 @@
    - 一旦前端开始使用这些接口，尽量避免随意更改 URL 和字段名；若需调整，可增加新版本路径（如 `/auth/v2/...`）。
 
 2. **管理员权限控制**：
-   - 建议给 `/auth/pending`、`/auth/approve`、`/auth/grant-admin`、`/auth/revoke-admin`、`/face-search/reset` 等接口增加登录校验与角色判断。
+  - 建议给 `/auth/pending`、`/auth/approve`、`/auth/grant-admin`、`/auth/revoke-admin` 等接口增加登录校验与角色判断。
 
 3. **错误码与 message**：
    - 统一约定：`success` + `message` 为前端展示主依据，必要时可补充 `code` 字段便于前端做细粒度处理。
