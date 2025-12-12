@@ -61,6 +61,14 @@ export async function createBgmSeparationTask({ file, bgmParams = {} }) {
   })
 }
 
+// 单次获取任务状态
+export async function getTaskStatus(identifier) {
+  if (!identifier) {
+    throw new Error('缺少任务标识符')
+  }
+  return requestJson(`/task/${identifier}`)
+}
+
 // 轮询任务状态，直到完成 / 失败 / 超时
 export async function pollTask(identifier, {
   intervalMs = 2000,

@@ -6,6 +6,7 @@ import {
   createBgmSeparationTask,
   pollTask,
   downloadBgmZip,
+  getTaskStatus,
 } from './task'
 import {
   indexFaceImage,
@@ -31,6 +32,7 @@ export {
   createBgmSeparationTask,
   pollTask,
   downloadBgmZip,
+  getTaskStatus,
   // Face Search
   indexFaceImage,
   searchFaceByImage,
