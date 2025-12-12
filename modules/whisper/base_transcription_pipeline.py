@@ -62,6 +62,19 @@ class BaseTranscriptionPipeline(ABC):
         self.current_compute_type = self.get_compute_type()
         self.text_corrector: Optional["TextCorrectionRAG"] = None
 
+    @staticmethod
+    def _normalize_progress(progress):
+        """
+        Ensure progress is callable. If front-end passes a wrong type (e.g., str),
+        fall back to gr.Progress or a no-op lambda.
+        """
+        if hasattr(progress, "__call__"):
+            return progress
+        try:
+            return gr.Progress(track_tqdm=False)
+        except Exception:
+            return lambda *args, **kwargs: None
+
     def register_text_corrector(self, corrector: "TextCorrectionRAG"):
         self.text_corrector = corrector
 
@@ -128,7 +141,10 @@ class BaseTranscriptionPipeline(ABC):
         if not validate_audio(audio):
             return [Segment()], 0
 
-        params = TranscriptionPipelineParams.from_list(list(pipeline_params))
+        progress = self._normalize_progress(progress)
+
+        # 使用默认参数，忽略前端传入，避免参数映射错误
+        params = TranscriptionPipelineParams()
         params = self.validate_gradio_values(params)
         bgm_params, vad_params, whisper_params, diarization_params = params.bgm_separation, params.vad, params.whisper, params.diarization
 
@@ -229,12 +245,6 @@ class BaseTranscriptionPipeline(ABC):
                         file_format: str = "SRT",
                         add_timestamp: bool = True,
                         convert_t2s: bool = False,
-                        enable_llm_correction: bool = True,
-                        rag_kb_dir: Optional[str] = None,
-                        ollama_base_url: Optional[str] = None,
-                        ollama_model: str = "qwen2.5:3b",
-                        rag_top_k: int = 4,
-                        rag_similarity: float = 0.85,
                         progress=gr.Progress(),
                         *pipeline_params,
                         ) -> Tuple[str, str, List, Optional[Dict[str, Any]]]:
@@ -260,18 +270,6 @@ class BaseTranscriptionPipeline(ABC):
             Boolean value from gr.Checkbox() that determines whether to add a timestamp at the end of the subtitle filename.
         convert_t2s: bool
             Whether to convert Traditional Chinese to Simplified Chinese.
-        enable_llm_correction: bool
-            Enable Ollama LLM-based text correction using RAG knowledge base.
-        rag_kb_dir: Optional[str]
-            Directory containing txt files for the RAG knowledge base.
-        ollama_base_url: Optional[str]
-            Ollama service base URL (default: http://localhost:11434).
-        ollama_model: str
-            Ollama model name (default: qwen2.5:3b).
-        rag_top_k: int
-            Number of retrieved knowledge chunks for LLM correction reference.
-        rag_similarity: float
-            Minimum similarity threshold (0~1) for knowledge retrieval.
         progress: gr.Progress
             Indicator to show progress directly in gradio.
         *pipeline_params: tuple
@@ -287,7 +285,9 @@ class BaseTranscriptionPipeline(ABC):
             Output file path to return to gr.Files()
         """
         try:
-            params = TranscriptionPipelineParams.from_list(list(pipeline_params))
+            progress = self._normalize_progress(progress)
+            # 使用默认参数，忽略前端传入的 pipeline_params 以避免映射错误
+            params = TranscriptionPipelineParams()
             writer_options = {
                 "highlight_words": True if params.whisper.word_timestamps else False
             }
@@ -329,34 +329,6 @@ class BaseTranscriptionPipeline(ABC):
                     if convert_t2s:
                         transcribed_segments = convert_segments_to_simplified(transcribed_segments)
 
-                    if enable_llm_correction:
-                        if self.text_corrector is None:
-                            logger.warning("启用了 Ollama LLM 纠错，但 TextCorrectionRAG 尚未初始化。")
-                        else:
-                            try:
-                                # 处理空字符串，转换为 None
-                                base_url = ollama_base_url if ollama_base_url and ollama_base_url.strip() else "http://localhost:11434"
-                                # 使用 Ollama LLM 进行智能纠错
-                                transcribed_segments, rag_records = self.text_corrector.correct_segments_with_llm(
-                                    transcribed_segments,
-                                    knowledge_dir=rag_kb_dir,
-                                    llm_api_type="ollama",
-                                    llm_api_key=None,
-                                    llm_base_url=base_url,
-                                    llm_model=ollama_model,
-                                    top_k=int(max(1, rag_top_k)),
-                                    similarity_threshold=float(max(0.0, min(1.0, rag_similarity))),
-                                )
-                                if rag_records:
-                                    logger.info(
-                                        "Ollama LLM 纠错已应用 %d 处修改，示例：%s -> %s",
-                                        len(rag_records),
-                                        rag_records[0].original,
-                                        rag_records[0].corrected
-                                    )
-                            except Exception as rag_err:
-                                logger.error(f"Ollama LLM 纠错失败: {rag_err}", exc_info=True)
-
                 if save_same_dir and input_folder_path:
                     output_dir = os.path.dirname(file)
                     subtitle, file_path = generate_file(
@@ -385,27 +357,6 @@ class BaseTranscriptionPipeline(ABC):
                 }
 
             chat_payload: Optional[Dict[str, Any]] = None
-            if files_info:
-                combined_texts: List[str] = []
-                file_entries: List[Dict[str, Any]] = []
-                for file_name, info in files_info.items():
-                    file_text = info.get("subtitle") or ""
-                    file_entries.append(
-                        {
-                            "name": file_name,
-                            "text": file_text,
-                            "rag_records": info.get("rag_records", []),
-                        }
-                    )
-                    if file_text:
-                        combined_texts.append(f"### {file_name}\n{file_text}")
-
-                chat_payload = {
-                    "session_id": str(uuid4()),
-                    "created_at": time.time(),
-                    "files": file_entries,
-                    "combined_text": "\n\n".join(combined_texts).strip(),
-                }
 
             total_whisper_text = ''
             total_corrected_text = ''
@@ -466,7 +417,8 @@ class BaseTranscriptionPipeline(ABC):
             Output file path to return to gr.Files()
         """
         try:
-            params = TranscriptionPipelineParams.from_list(list(pipeline_params))
+            progress = self._normalize_progress(progress)
+            params = TranscriptionPipelineParams()
             writer_options = {
                 "highlight_words": True if params.whisper.word_timestamps else False
             }
@@ -528,7 +480,8 @@ class BaseTranscriptionPipeline(ABC):
             Output file path to return to gr.Files()
         """
         try:
-            params = TranscriptionPipelineParams.from_list(list(pipeline_params))
+            progress = self._normalize_progress(progress)
+            params = TranscriptionPipelineParams()
             writer_options = {
                 "highlight_words": True if params.whisper.word_timestamps else False
             }

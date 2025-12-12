@@ -4,6 +4,8 @@ import hashlib
 import uuid
 import shutil
 from typing import List, Tuple, Dict, Optional, Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 import numpy as np
 import cv2
@@ -34,7 +36,8 @@ class FaceSearchService:
     """
     
     def __init__(self, db_dir: str = "face_db", det_size: Tuple[int, int] = (512, 512),
-                 max_faces_per_image: int = 10, flush_batch_size: int = 1024, max_image_side: int = 1600):
+                 max_faces_per_image: int = 100, flush_batch_size: int = 1024, max_image_side: int = 1600,
+                 max_workers: Optional[int] = None):
         """
         初始化人脸搜索服务。
         
@@ -44,6 +47,7 @@ class FaceSearchService:
             max_faces_per_image: 每张图片最多处理的人脸数量
             flush_batch_size: 批量写入数据库的批次大小
             max_image_side: 图片最大边长，超过此尺寸会自动缩放
+            max_workers: 并行处理的线程数，None 表示自动（CPU核心数），0 表示禁用并行
         """
         self.db_dir = db_dir
         os.makedirs(self.db_dir, exist_ok=True)
@@ -61,8 +65,19 @@ class FaceSearchService:
         self.max_faces_per_image = max_faces_per_image
         self.flush_batch_size = max(64, int(flush_batch_size))
         self.max_image_side = max_image_side
+        # 并行处理设置
+        if max_workers == 0:
+            self.max_workers = 1  # 禁用并行
+        elif max_workers is None:
+            import multiprocessing
+            self.max_workers = max(1, multiprocessing.cpu_count())
+        else:
+            self.max_workers = max(1, int(max_workers))
         # In-memory MD5 set
         self._seen_md5s = self._load_md5_index()
+        # 线程锁，用于保护共享资源
+        self._md5_lock = Lock()
+        self._db_lock = Lock()
 
     # ---------- Lazy initializers ----------
     def _ensure_insightface(self):
@@ -81,7 +96,10 @@ class FaceSearchService:
             providers = ['CPUExecutionProvider']
         self._insight_app = FaceAnalysis(name="buffalo_l", providers=providers)
         self._insight_app.prepare(ctx_id=0, det_size=self.det_size)
-        logger.info("InsightFace initialized.")
+        if 'CUDAExecutionProvider' in providers:
+            logger.info("InsightFace initialized with GPU (CUDA) support.")
+        else:
+            logger.info("InsightFace initialized with CPU only.")
 
     def _ensure_chromadb(self):
         if self._chroma_client is not None and self._collection is not None:
@@ -312,10 +330,175 @@ class FaceSearchService:
         
         return embs
 
+    def detect_and_visualize_faces(self, image_path: str, output_path: Optional[str] = None) -> Tuple[Optional[str], int, List[Dict]]:
+        """
+        检测图像中的人脸并在图像上绘制边界框，返回可视化结果。
+        
+        Args:
+            image_path: 图像文件路径
+            output_path: 输出图像路径（可选），如果为 None 则返回临时文件路径
+            
+        Returns:
+            (可视化图像路径, 检测到的人脸数量, 人脸信息列表)
+            人脸信息包含: bbox (边界框), confidence (置信度), age (年龄，如果有), gender (性别，如果有)
+        """
+        self._ensure_insightface()
+        img = self._read_image(image_path)
+        if img is None:
+            return None, 0, []
+        
+        # 保存原始尺寸用于绘制
+        original_h, original_w = img.shape[:2]
+        scale_x = original_w
+        scale_y = original_h
+        
+        # 可选缩放以提升速度（保持宽高比）
+        if self.max_image_side and max(img.shape[0], img.shape[1]) > self.max_image_side:
+            h, w = img.shape[:2]
+            scale = self.max_image_side / max(h, w)
+            new_w, new_h = int(w * scale), int(h * scale)
+            scale_x = original_w / new_w
+            scale_y = original_h / new_h
+            img_resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        else:
+            img_resized = img.copy()
+        
+        try:
+            faces = self._insight_app.get(img_resized)
+        except Exception as e:
+            logger.error(f"人脸检测失败 {image_path}: {e}")
+            return None, 0, []
+        
+        # 不限制数量，显示所有检测到的人脸
+        # 创建可视化图像（使用原始尺寸）
+        vis_img = self._read_image(image_path)
+        if vis_img is None:
+            return None, 0, []
+        
+        face_info_list = []
+        
+        # 绘制边界框和标签
+        for idx, face in enumerate(faces):
+            # 获取边界框（需要缩放回原始尺寸）
+            bbox = face.bbox.astype(int)  # [x1, y1, x2, y2]
+            # 如果图像被缩放，需要将坐标映射回原始尺寸
+            if self.max_image_side and max(original_h, original_w) > self.max_image_side:
+                bbox[0] = int(bbox[0] * scale_x)  # x1
+                bbox[1] = int(bbox[1] * scale_y)  # y1
+                bbox[2] = int(bbox[2] * scale_x)  # x2
+                bbox[3] = int(bbox[3] * scale_y)  # y2
+            
+            x1, y1, x2, y2 = bbox
+            
+            # 确保坐标在图像范围内
+            x1 = max(0, min(x1, original_w - 1))
+            y1 = max(0, min(y1, original_h - 1))
+            x2 = max(0, min(x2, original_w - 1))
+            y2 = max(0, min(y2, original_h - 1))
+            
+            # 绘制边界框（绿色，线宽2）
+            cv2.rectangle(vis_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # 保存人脸信息
+            face_info = {
+                "index": idx + 1,
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "confidence": float(face.det_score) if hasattr(face, 'det_score') and face.det_score is not None else None,
+                "age": int(face.age) if hasattr(face, 'age') and face.age is not None else None,
+                "gender": "M" if (hasattr(face, 'gender') and face.gender == 1) else ("F" if (hasattr(face, 'gender') and face.gender == 0) else None)
+            }
+            face_info_list.append(face_info)
+        
+        # 保存可视化结果
+        try:
+            if output_path is None:
+                # 创建临时文件
+                import tempfile
+                os.makedirs(self.images_dir, exist_ok=True)
+                ext = os.path.splitext(image_path)[1].lower()
+                if ext not in SUPPORTED_IMAGE_EXTENSIONS:
+                    ext = ".png"
+                fd, output_path = tempfile.mkstemp(suffix=ext, prefix="face_detection_", dir=self.images_dir)
+                os.close(fd)
+            
+            # 确保输出目录存在
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # 保存图像（使用 cv2.imencode 支持中文路径）
+            success, encoded_img = cv2.imencode(os.path.splitext(output_path)[1], vis_img)
+            if success:
+                with open(output_path, 'wb') as f:
+                    f.write(encoded_img.tobytes())
+            else:
+                # 如果编码失败，尝试使用 PIL
+                from PIL import Image
+                rgb_img = cv2.cvtColor(vis_img, cv2.COLOR_BGR2RGB)
+                pil_img = Image.fromarray(rgb_img)
+                pil_img.save(output_path)
+            
+            return output_path, len(face_info_list), face_info_list
+        except Exception as e:
+            logger.error(f"保存可视化图像失败: {e}", exc_info=True)
+            return None, len(face_info_list), face_info_list
+
+    def _process_single_image(self, image_path: str) -> Tuple[Optional[str], Optional[List[np.ndarray]], Optional[str], Optional[str]]:
+        """
+        处理单张图像，提取人脸特征。
+        
+        Returns:
+            (stored_path, embeddings, file_md5, error_msg)
+            如果成功: (stored_path, embeddings, file_md5, None)
+            如果失败: (None, None, None, error_msg)
+        """
+        try:
+            # 验证文件
+            is_valid, error_msg = self._validate_image_file(image_path)
+            if not is_valid:
+                return None, None, None, f"{image_path}: {error_msg}"
+            
+            # 先检查文件是否已存在（基于路径的快速检查）
+            # 如果文件路径已经在 seen_md5s 中（通过其他方式），可以快速跳过
+            # 但这里我们仍然需要计算 MD5 来确保准确性
+            
+            # MD5 去重检查（使用锁保护）
+            # 注意：MD5 计算是 IO 密集型操作，但在并行处理中，多个线程可以同时计算不同文件的 MD5
+            file_md5 = self._compute_file_md5(image_path)
+            if file_md5:
+                with self._md5_lock:
+                    if file_md5 in self._seen_md5s:
+                        return None, None, None, None  # 跳过重复文件，不视为错误
+            
+            # 先提取特征，如果成功再复制文件（避免复制无脸图片）
+            # 但为了保持一致性，我们仍然先复制文件
+            # 优化：可以先检测再复制，但为了代码简洁性，保持当前逻辑
+            
+            # 复制文件到存储目录
+            stored_path = self._store_image_file(image_path, file_md5)
+            if not stored_path:
+                return None, None, None, f"{image_path}: 无法复制到存储目录。"
+            
+            # 提取人脸特征
+            embs = self._extract_face_embeddings(stored_path)
+            if not embs:
+                self._safe_remove_file(stored_path)
+                return None, None, None, f"{image_path}: 未检测到人脸"
+            
+            # 记录 MD5（使用锁保护）
+            if file_md5:
+                with self._md5_lock:
+                    self._seen_md5s.add(file_md5)
+            
+            return stored_path, embs, file_md5, None
+            
+        except Exception as e:
+            logger.error(f"处理图像失败 {image_path}: {e}", exc_info=True)
+            return None, None, None, f"{image_path}: {str(e)}"
+
     # ---------- Public APIs ----------
     def add_images(self, image_paths: List[str], progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, int, List[str]]:
         """
         将图像添加到数据库进行索引。每张检测到的人脸都会成为一个向量条目。
+        支持并行处理以提升性能。
         
         Args:
             image_paths: 图像文件路径列表
@@ -331,84 +514,142 @@ class FaceSearchService:
         total_faces = 0
         processed = 0
         errors: List[str] = []
-        ids: List[str] = []
-        embeddings: List[List[float]] = []
-        metadatas: List[Dict] = []
-        documents: List[str] = []
-
+        
+        # 用于批量写入的缓冲区
+        batch_ids: List[str] = []
+        batch_embeddings: List[List[float]] = []
+        batch_metadatas: List[Dict] = []
+        batch_documents: List[str] = []
+        
         total = len(image_paths)
-        for idx, p in enumerate(image_paths):
-            try:
-                # 进度回调
-                if progress_callback:
-                    progress_callback(idx + 1, total, p)
+        completed = 0
+        
+        # 使用并行处理（如果启用）
+        if self.max_workers > 1 and total > 1:
+            # 并行处理模式
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                # 提交所有任务
+                future_to_path = {executor.submit(self._process_single_image, p): p for p in image_paths}
                 
-                # 验证文件
-                is_valid, error_msg = self._validate_image_file(p)
-                if not is_valid:
-                    errors.append(f"{p}: {error_msg}")
-                    logger.warning(f"跳过无效文件 {p}: {error_msg}")
-                    continue
-                
-                # MD5 去重：若同一字节内容已导入过，则跳过
-                file_md5 = self._compute_file_md5(p)
-                if file_md5 and file_md5 in self._seen_md5s:
-                    logger.debug(f"跳过重复文件: {p}")
-                    continue
-
-                stored_path = self._store_image_file(p, file_md5)
-                if not stored_path:
-                    errors.append(f"{p}: 无法复制到存储目录。")
-                    continue
-
-                embs = self._extract_face_embeddings(stored_path)
-                if not embs:
-                    errors.append(f"{p}: 未检测到人脸")
-                    logger.debug(f"未检测到人脸: {p}")
-                    self._safe_remove_file(stored_path)
-                    continue
-
-                processed += 1
-                for emb in embs:
-                    total_faces += 1
-                    face_id = str(uuid.uuid4())
-                    ids.append(face_id)
-                    embeddings.append(emb.tolist())
-                    metadatas.append({
-                        "path": stored_path,
-                        "original_path": p,
-                        "md5": file_md5 or ""
-                    })
-                    documents.append(os.path.basename(stored_path))
-
-                # 索引成功（有嵌入）才记录 MD5，避免把无脸图片标记为已导入
-                if file_md5:
-                    self._seen_md5s.add(file_md5)
-
-                # 批量写入以控制内存
-                if len(ids) >= self.flush_batch_size:
+                # 处理完成的任务
+                for future in as_completed(future_to_path):
+                    completed += 1
+                    image_path = future_to_path[future]
+                    
+                    # 进度回调
+                    if progress_callback:
+                        progress_callback(completed, total, image_path)
+                    
                     try:
-                        self._collection.add(ids=ids, embeddings=embeddings, metadatas=metadatas, documents=documents)
-                        ids, embeddings, metadatas, documents = [], [], [], []
-                    except Exception as e:
-                        logger.error(f"批量写入数据库失败: {e}")
-                        errors.append(f"批量写入失败: {e}")
-                        # 清空当前批次，继续处理
-                        ids, embeddings, metadatas, documents = [], [], [], []
+                        stored_path, embs, file_md5, error_msg = future.result()
                         
-            except Exception as e:
-                error_msg = f"{p}: {str(e)}"
-                errors.append(error_msg)
-                logger.error(f"处理图像失败 {p}: {e}", exc_info=True)
-                continue
+                        if error_msg:
+                            if error_msg:  # 只有非空错误才记录
+                                errors.append(error_msg)
+                            continue
+                        
+                        if stored_path is None or embs is None:
+                            continue  # 跳过重复文件等
+                        
+                        # 添加到批次缓冲区
+                        processed += 1
+                        for emb in embs:
+                            total_faces += 1
+                            face_id = str(uuid.uuid4())
+                            batch_ids.append(face_id)
+                            batch_embeddings.append(emb.tolist())
+                            batch_metadatas.append({
+                                "path": stored_path,
+                                "original_path": image_path,
+                                "md5": file_md5 or ""
+                            })
+                            batch_documents.append(os.path.basename(stored_path))
+                        
+                        # 批量写入以控制内存
+                        if len(batch_ids) >= self.flush_batch_size:
+                            with self._db_lock:
+                                try:
+                                    self._collection.add(
+                                        ids=batch_ids,
+                                        embeddings=batch_embeddings,
+                                        metadatas=batch_metadatas,
+                                        documents=batch_documents
+                                    )
+                                    batch_ids, batch_embeddings, batch_metadatas, batch_documents = [], [], [], []
+                                except Exception as e:
+                                    logger.error(f"批量写入数据库失败: {e}")
+                                    errors.append(f"批量写入失败: {e}")
+                                    batch_ids, batch_embeddings, batch_metadatas, batch_documents = [], [], [], []
+                                    
+                    except Exception as e:
+                        error_msg = f"{image_path}: {str(e)}"
+                        errors.append(error_msg)
+                        logger.error(f"处理图像结果失败 {image_path}: {e}", exc_info=True)
+        else:
+            # 串行处理模式（兼容旧代码）
+            for idx, p in enumerate(image_paths):
+                try:
+                    # 进度回调
+                    if progress_callback:
+                        progress_callback(idx + 1, total, p)
+                    
+                    stored_path, embs, file_md5, error_msg = self._process_single_image(p)
+                    
+                    if error_msg:
+                        if error_msg:  # 只有非空错误才记录
+                            errors.append(error_msg)
+                        continue
+                    
+                    if stored_path is None or embs is None:
+                        continue  # 跳过重复文件等
+                    
+                    processed += 1
+                    for emb in embs:
+                        total_faces += 1
+                        face_id = str(uuid.uuid4())
+                        batch_ids.append(face_id)
+                        batch_embeddings.append(emb.tolist())
+                        batch_metadatas.append({
+                            "path": stored_path,
+                            "original_path": p,
+                            "md5": file_md5 or ""
+                        })
+                        batch_documents.append(os.path.basename(stored_path))
+                    
+                    # 批量写入以控制内存
+                    if len(batch_ids) >= self.flush_batch_size:
+                        try:
+                            self._collection.add(
+                                ids=batch_ids,
+                                embeddings=batch_embeddings,
+                                metadatas=batch_metadatas,
+                                documents=batch_documents
+                            )
+                            batch_ids, batch_embeddings, batch_metadatas, batch_documents = [], [], [], []
+                        except Exception as e:
+                            logger.error(f"批量写入数据库失败: {e}")
+                            errors.append(f"批量写入失败: {e}")
+                            batch_ids, batch_embeddings, batch_metadatas, batch_documents = [], [], [], []
+                            
+                except Exception as e:
+                    error_msg = f"{p}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(f"处理图像失败 {p}: {e}", exc_info=True)
+                    continue
 
         # 写入剩余数据
-        if ids:
-            try:
-                self._collection.add(ids=ids, embeddings=embeddings, metadatas=metadatas, documents=documents)
-            except Exception as e:
-                logger.error(f"最终批量写入失败: {e}")
-                errors.append(f"最终批量写入失败: {e}")
+        if batch_ids:
+            with self._db_lock:
+                try:
+                    self._collection.add(
+                        ids=batch_ids,
+                        embeddings=batch_embeddings,
+                        metadatas=batch_metadatas,
+                        documents=batch_documents
+                    )
+                except Exception as e:
+                    logger.error(f"最终批量写入失败: {e}")
+                    errors.append(f"最终批量写入失败: {e}")
 
         # 持久化 MD5 索引
         self._save_md5_index()
