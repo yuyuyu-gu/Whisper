@@ -1,9 +1,11 @@
-# 后端 REST 接口建议文档（认证）
+# 认证 / Auth API 文档
+
+后端 router：`backend/routers/auth/router.py`
 
 ## 一、认证与用户审批接口（Auth）
 
-- 推荐统一前缀：`/auth`
-- 后端内部实现建议基于 `services/auth/service.py` 中的 `AuthService`。
+- 统一前缀：`/auth`
+- 内部实现基于 `services/auth/service.py` 中的 `AuthService`。
 
 ### 1. 用户注册
 
@@ -37,6 +39,7 @@
 ```
 
 > 对应 `AuthService.register_user(username, password)`。
+> 当前实现中还包含密码强度校验：密码长度至少为 6 位；若过短，会返回类似 "密码长度至少为 6 位。" 的提示。
 
 ---
 
@@ -74,6 +77,7 @@
 ```
 
 > 对应 `AuthService.login_user(username, password)`。
+> 可能返回的错误信息包括："请输入用户名和密码。"、"用户名或密码不正确。"、"该账号尚未通过管理员审核。" 等。
 > 如需会话/鉴权，可在此接口扩展返回 `token` 字段。  
 
 ---
@@ -228,7 +232,7 @@
    - 一旦前端开始使用这些接口，尽量避免随意更改 URL 和字段名；若需调整，可增加新版本路径（如 `/auth/v2/...`）。
 
 2. **管理员权限控制**：
-   - 建议给 `/auth/pending`、`/auth/approve`、`/auth/grant-admin`、`/auth/revoke-admin`、`/face-search/reset` 等接口增加登录校验与角色判断。
+  - 建议给 `/auth/pending`、`/auth/approve`、`/auth/grant-admin`、`/auth/revoke-admin` 等接口增加登录校验与角色判断。
 
 3. **错误码与 message**：
    - 统一约定：`success` + `message` 为前端展示主依据，必要时可补充 `code` 字段便于前端做细粒度处理。
