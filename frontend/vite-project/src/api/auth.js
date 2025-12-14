@@ -93,3 +93,27 @@ export async function revokeAdmin({ targetUsername, currentUsername }) {
     }),
   })
 }
+
+// 你现有接口：getPendingUsers、approveUser、getAllUsers、grantAdmin、revokeAdmin
+
+/**
+ * 获取当前登录用户的信息（包含role）
+ */
+export function getCurrentUser() {
+  return new Promise((resolve, reject) => {
+    // 替换为你的真实后端接口（比如 /api/auth/current-user）
+    fetch('/api/auth/current-user', {
+      method: 'GET',
+      credentials: 'include', // 携带cookie（如果是session认证）
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.code === 200) resolve(data)
+        else reject(new Error(data.msg || '获取用户信息失败'))
+      })
+      .catch(err => reject(err))
+  })
+}

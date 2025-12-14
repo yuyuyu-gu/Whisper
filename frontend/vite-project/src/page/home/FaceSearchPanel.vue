@@ -406,7 +406,10 @@ watch([topK, scoreThreshold], () => {
 
 // 页面挂载时加载统计信息
 onMounted(() => {
-  fetchStats()
+  // 轻微延迟让动画完整展示
+  setTimeout(() => {
+    fetchStats()
+  }, 100)
 })
 
 // 组件卸载时释放摄像头资源
@@ -429,9 +432,9 @@ onUnmounted(() => {
     <main class="main-content">
       <!-- 左侧操作面板 -->
       <div class="left-panel">
-        <div class="card">
+        <div class="card card-1">
           <!-- 1. 图像来源区域 -->
-          <div class="section">
+          <div class="section section-1">
             <h3 class="section-title">1. 选择图像来源</h3>
 
             <!-- 上传区域 -->
@@ -485,7 +488,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 2. 搜索参数配置 -->
-          <div class="section">
+          <div class="section section-2">
             <h3 class="section-title">2. 检索参数配置</h3>
 
             <!-- 返回结果数量 -->
@@ -535,7 +538,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 3. 执行检索 -->
-          <div class="section">
+          <div class="section section-3">
             <button
               class="btn btn-primary btn-large"
               @click="handleSearch"
@@ -550,14 +553,14 @@ onUnmounted(() => {
           </div>
 
           <!-- 4. 状态提示 -->
-          <div class="section status-section" v-if="statusMsg">
+          <div class="section section-4 status-section" v-if="statusMsg">
             <div class="status-box">
               {{ statusMsg }}
             </div>
           </div>
 
           <!-- 5. 人脸库统计 -->
-          <div class="section stats-section">
+          <div class="section section-5 stats-section">
             <h3 class="section-title">3. 人脸库统计</h3>
             <div class="stats-grid">
               <div class="stat-item">
@@ -579,7 +582,7 @@ onUnmounted(() => {
 
       <!-- 右侧结果面板 -->
       <div class="right-panel">
-        <div class="card">
+        <div class="card card-2">
           <h3 class="section-title">检索结果 ({{ searchResults.length }})</h3>
 
           <!-- 空结果提示 -->
@@ -664,10 +667,56 @@ onUnmounted(() => {
   background-color: #f5f7fa;
 }
 
-/* 页面头部 */
+/* ===================== 新增：载入动画关键帧 ===================== */
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sectionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes elementFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ===================== 页面头部动画 ===================== */
 .page-header {
   text-align: center;
   margin-bottom: 30px;
+  opacity: 0;
+  animation: elementFadeIn 0.4s ease-out forwards;
+  animation-delay: 0.05s;
 }
 
 .page-header h1 {
@@ -679,6 +728,9 @@ onUnmounted(() => {
 .page-desc {
   color: #6b7280;
   font-size: 16px;
+  opacity: 0;
+  animation: elementFadeIn 0.4s ease-out forwards;
+  animation-delay: 0.15s;
 }
 
 /* 主内容区 */
@@ -688,24 +740,60 @@ onUnmounted(() => {
   gap: 20px;
 }
 
-/* 通用卡片样式 */
+/* 通用卡片样式 + 载入动画 */
 .card {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   padding: 24px;
   height: 100%;
+  opacity: 0;
+  transform: translateY(15px) scale(0.98);
+  animation: panelFadeIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transition: all 0.3s ease-in-out;
 }
 
-/* 左侧面板 */
-.left-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+/* 左右面板卡片不同延迟，形成层次感 */
+.card-1 { /* 左侧面板 */
+  animation-delay: 0.1s;
+}
+.card-2 { /* 右侧面板 */
+  animation-delay: 0.25s;
 }
 
+/* 卡片hover上浮效果 */
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+/* ===================== 面板内section分层动画 ===================== */
 .section {
   margin-bottom: 24px;
+  opacity: 0;
+  transform: translateX(-10px);
+  animation: sectionFadeIn 0.4s ease-out forwards;
+}
+
+/* 左侧面板section延迟（基于卡片延迟叠加） */
+.card-1 .section-1 { animation-delay: 0.2s; }
+.card-1 .section-2 { animation-delay: 0.35s; }
+.card-1 .section-3 { animation-delay: 0.5s; }
+.card-1 .section-4 { animation-delay: 0.65s; }
+.card-1 .section-5 { animation-delay: 0.8s; }
+
+/* 右侧面板section延迟 */
+.card-2 .section-title {
+  opacity: 0;
+  animation: elementFadeIn 0.4s ease-out forwards;
+  animation-delay: 0.4s;
+}
+.card-2 .empty-result,
+.card-2 .loading-result,
+.card-2 .results-grid {
+  opacity: 0;
+  animation: elementFadeIn 0.4s ease-out forwards;
+  animation-delay: 0.55s;
 }
 
 .section:last-child {
@@ -719,11 +807,17 @@ onUnmounted(() => {
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid #f0f2f5;
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  animation-delay: inherit; /* 继承section的延迟 */
 }
 
 /* 上传区域 */
 .upload-area {
   margin-bottom: 16px;
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  animation-delay: calc(inherit + 0.1s);
 }
 
 .upload-label {
@@ -778,6 +872,9 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  animation-delay: calc(inherit + 0.2s);
 }
 
 .btn {
@@ -839,6 +936,9 @@ onUnmounted(() => {
 /* 参数配置 */
 .param-item {
   margin-bottom: 16px;
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  animation-delay: calc(inherit + 0.1s);
 }
 
 .param-label {
@@ -872,6 +972,9 @@ onUnmounted(() => {
   margin-top: 4px;
   font-size: 12px;
   color: #9ca3af;
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  animation-delay: calc(inherit + 0.2s);
 }
 
 /* 状态提示 */
@@ -891,6 +994,9 @@ onUnmounted(() => {
 .stats-grid {
   display: grid;
   gap: 8px;
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  animation-delay: calc(inherit + 0.1s);
 }
 
 .stat-item {
@@ -954,7 +1060,19 @@ onUnmounted(() => {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
+  /* 结果项逐个延迟，增强层次感 */
+  animation-delay: calc(0.6s + (var(--item-index) * 0.1s));
 }
+
+/* 给每个结果项设置index变量（Vue中通过style绑定） */
+.result-item:nth-child(1) { --item-index: 1; }
+.result-item:nth-child(2) { --item-index: 2; }
+.result-item:nth-child(3) { --item-index: 3; }
+.result-item:nth-child(4) { --item-index: 4; }
+.result-item:nth-child(5) { --item-index: 5; }
+.result-item:nth-child(n+6) { --item-index: 6; } /* 超过5个统一延迟 */
 
 .result-img-container {
   width: 100%;
@@ -990,7 +1108,7 @@ onUnmounted(() => {
   word-break: break-all;
 }
 
-/* 摄像头弹窗 */
+/* 摄像头弹窗 + 动画 */
 .modal {
   position: fixed;
   top: 0;
@@ -1010,6 +1128,8 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  animation: elementFadeIn 0.3s ease-out forwards;
 }
 
 .modal-content {
@@ -1019,6 +1139,10 @@ onUnmounted(() => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   position: relative;
   z-index: 1;
+  opacity: 0;
+  transform: scale(0.95) translateY(20px);
+  animation: modalFadeIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation-delay: 0.1s;
 }
 
 .modal-header {
@@ -1125,11 +1249,22 @@ onUnmounted(() => {
   }
 }
 
-/* 响应式适配 */
+/* 响应式适配 + 动画优化 */
 @media (max-width: 1024px) {
   .main-content {
     grid-template-columns: 1fr;
   }
+
+  /* 移动端简化面板延迟，避免动画过长 */
+  .card-1 { animation-delay: 0.05s; }
+  .card-2 { animation-delay: 0.15s; }
+
+  /* 简化section延迟 */
+  .card-1 .section-1 { animation-delay: 0.15s; }
+  .card-1 .section-2 { animation-delay: 0.25s; }
+  .card-1 .section-3 { animation-delay: 0.35s; }
+  .card-1 .section-4 { animation-delay: 0.45s; }
+  .card-1 .section-5 { animation-delay: 0.55s; }
 
   .modal-content {
     width: 90%;
@@ -1148,6 +1283,11 @@ onUnmounted(() => {
 
   .camera-container {
     height: 300px;
+  }
+
+  /* 移动端结果项动画延迟统一 */
+  .result-item {
+    animation-delay: 0.6s !important;
   }
 }
 </style>
