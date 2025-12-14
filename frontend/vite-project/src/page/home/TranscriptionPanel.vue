@@ -1,6 +1,5 @@
-<script setup lang="ts">
-import { ref, computed, onMounted, watch, debounce } from 'vue'
-import type { Ref } from 'vue'
+<script setup>
+import { ref, computed, onMounted } from 'vue'
 import {
   createTranscriptionTask,
   pollTask,
@@ -10,209 +9,104 @@ import {
   downloadBgmZip
 } from '../../api/backend'
 
-// ======================== 类型定义 ========================
-interface TranscriptionSegment {
-  start: number
-  end: number
-  text: string
-}
-
-interface TaskStatus {
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  progress: number
-  result?: TranscriptionSegment[]
-  duration?: number
-  error?: string
-}
-
-interface TaskQueue {
-  identifier: string
-  status: TaskStatus['status']
-}
-
 // ======================== 全局统一文件上传 ========================
-const globalFile = ref<File | null>(null)
+const globalFile = ref(null)
 const globalFileName = ref('Not selected file')
 
-function onGlobalFileChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  const [file] = target.files || []
+function onGlobalFileChange(event) {
+  const [file] = event.target.files || []
   globalFile.value = file || null
   globalFileName.value = file ? file.name : 'Not selected file'
-  // 重置任务状态
-  resetTranscriptionState()
 }
 
-// 增强拖放功能
-const handleDrop = (e: DragEvent) => {
-  e.preventDefault()
-  const [file] = e.dataTransfer?.files || []
-  if (file) {
-    globalFile.value = file
-    globalFileName.value = file.name
-    resetTranscriptionState()
-  }
-}
-
-const handleDragOver = (e: DragEvent) => {
-  e.preventDefault()
-}
-
-// ======================== 语音转写核心参数 ========================
+// ======================== 语音转写（一键转字幕）相关 ========================
 const LS_TRANS_TASK_KEY = 'whisper_transcription_task'
 
 // 基础参数
-const transModelSize = ref<'tiny' | 'base' | 'small' | 'medium' | 'large-v2'>('large-v2')
-const transLang = ref<string>('')
-const transTranslate = ref<boolean>(false)
-const transUseVad = ref<boolean>(false)
-const transUseDiarization = ref<boolean>(false)
-const transUseBgm = ref<boolean>(false)
-const transShowAdvanced = ref<boolean>(false)
-const transSubtitleFormat = ref<'SRT' | 'TXT'>('SRT')
-const transAddTimestampToFilename = ref<boolean>(false)
-const transShowParams = ref<boolean>(true)
+const transModelSize = ref('large-v2')
+const transLang = ref('')
+const transTranslate = ref(false)
+const transUseVad = ref(false)
+const transUseDiarization = ref(false)
+const transUseBgm = ref(false)
+const transShowAdvanced = ref(false)
+const transSubtitleFormat = ref('SRT')
+const transAddTimestampToFilename = ref(false)
+// 新增：参数面板折叠状态
+const transShowParams = ref(true)
 
 // 高级子面板折叠状态
-const showBgmSubpanel = ref<boolean>(true)
-const showVadSubpanel = ref<boolean>(true)
-const showDiarizationSubpanel = ref<boolean>(true)
-const showWhisperSubpanel = ref<boolean>(true)
+const showBgmSubpanel = ref(true)
+const showVadSubpanel = ref(true)
+const showDiarizationSubpanel = ref(true)
+const showWhisperSubpanel = ref(true)
 
 // 关键词查找相关
-const keyword = ref<string>('')
-const searchResult = ref<(TranscriptionSegment & { startSrt: string; endSrt: string })[]>([])
+const keyword = ref('')
+const searchResult = ref([])
 
-// Whisper 高级参数
-const transBeamSize = ref<number>(5)
-const transLogProbThreshold = ref<number>(-1.0)
-const transNoSpeechThreshold = ref<number>(0.6)
-const transComputeType = ref<'float16' | 'int8' | 'int16'>('float16')
-const transBestOf = ref<number>(5)
-const transPatience = ref<number>(1.0)
-const transConditionOnPreviousText = ref<boolean>(true)
-const transPromptResetOnTemperature = ref<number>(0.5)
-const transInitialPrompt = ref<string>('')
-const transTemperature = ref<number>(0.0)
-const transCompressionRatioThreshold = ref<number>(2.4)
-const transLengthPenalty = ref<number>(1.0)
-const transRepetitionPenalty = ref<number>(1.0)
-const transNoRepeatNgramSize = ref<number>(0)
-const transPrefix = ref<string>('')
-const transSuppressBlank = ref<boolean>(true)
-const transSuppressTokens = ref<string>('')
-const transMaxInitialTimestamp = ref<number>(1.0)
-const transWordTimestamps = ref<boolean>(false)
-const transPrependPunctuations = ref<string>('"\'“¿([{-')
-const transAppendPunctuations = ref<string>('"\'.。,，!！?？:：”)]}、')
-const transMaxNewTokens = ref<string>('')
-const transChunkLength = ref<number>(30)
-const transHallucinationSilenceThreshold = ref<string>('')
-const transHotwords = ref<string>('')
-const transLanguageDetectionThreshold = ref<number>(0.5)
-const transLanguageDetectionSegments = ref<number>(1)
-const transBatchSize = ref<number>(24)
-const transEnableOffload = ref<boolean>(true)
+// Whisper 高级参数（保留原有）
+const transBeamSize = ref(5)
+const transLogProbThreshold = ref(-1.0)
+const transNoSpeechThreshold = ref(0.6)
+const transComputeType = ref('float16')
+const transBestOf = ref(5)
+const transPatience = ref(1.0)
+const transConditionOnPreviousText = ref(true)
+const transPromptResetOnTemperature = ref(0.5)
+const transInitialPrompt = ref('')
+const transTemperature = ref(0.0)
+const transCompressionRatioThreshold = ref(2.4)
+const transLengthPenalty = ref(1.0)
+const transRepetitionPenalty = ref(1.0)
+const transNoRepeatNgramSize = ref(0)
+const transPrefix = ref('')
+const transSuppressBlank = ref(true)
+const transSuppressTokens = ref('')
+const transMaxInitialTimestamp = ref(1.0)
+const transWordTimestamps = ref(false)
+const transPrependPunctuations = ref('"\'“¿([{-')
+const transAppendPunctuations = ref('"\'.。,，!！?？:：”)]}、')
+const transMaxNewTokens = ref('')
+const transChunkLength = ref(30)
+const transHallucinationSilenceThreshold = ref('')
+const transHotwords = ref('')
+const transLanguageDetectionThreshold = ref(0.5)
+const transLanguageDetectionSegments = ref(1)
+const transBatchSize = ref(24)
+const transEnableOffload = ref(true)
 
-// VAD 参数
-const transVadThreshold = ref<number>(0.5)
-const transVadMinSpeechMs = ref<number>(250)
-const transVadMaxSpeechSec = ref<string>('9999')
-const transVadMinSilenceMs = ref<number>(2000)
-const transVadSpeechPadMs = ref<number>(400)
+// VAD 参数（整合到高级面板）
+const transVadThreshold = ref(0.5)
+const transVadMinSpeechMs = ref(250)
+const transVadMaxSpeechSec = ref('9999')
+const transVadMinSilenceMs = ref(2000)
+const transVadSpeechPadMs = ref(400)
 
-// BGM 参数
-const transBgmUvrModelSize = ref<'UVR-MDX-NET-Inst_HQ_4' | 'UVR-MDX-NET-Inst_3'>('UVR-MDX-NET-Inst_HQ_4')
-const transBgmUvrDevice = ref<'cpu' | 'cuda' | 'xpu'>('cuda')
-const transBgmSegmentSize = ref<number>(256)
-const transBgmSaveFile = ref<boolean>(false)
-const transBgmEnableOffload = ref<boolean>(true)
+// BGM 参数（整合到高级面板）
+const transBgmUvrModelSize = ref('UVR-MDX-NET-Inst_HQ_4')
+const transBgmUvrDevice = ref('cuda')
+const transBgmSegmentSize = ref(256)
+const transBgmSaveFile = ref(false)
+const transBgmEnableOffload = ref(true)
 
-// 说话人分离参数
-const transDiarizationDevice = ref<'cpu' | 'cuda' | 'xpu'>('cuda')
-const transDiarizationHfToken = ref<string>('')
-const transDiarizationEnableOffload = ref<boolean>(true)
+// 说话人分离参数（整合到高级面板）
+const transDiarizationDevice = ref('cuda')
+const transDiarizationHfToken = ref('')
+const transDiarizationEnableOffload = ref(true)
 
 // 任务状态
-const transTaskId = ref<string>('')
-const transStatus = ref<TaskStatus['status']>('')
-const transProgress = ref<number>(0)
-const transDuration = ref<number | null>(null)
-const transResult = ref<TranscriptionSegment[]>([])
-const transError = ref<string>('')
-const transLoading = ref<boolean>(false)
+const transTaskId = ref('')
+const transStatus = ref('')
+const transProgress = ref(0)
+const transDuration = ref(null)
+const transResult = ref([])
+const transError = ref('')
+const transLoading = ref(false)
 
-// ======================== 工具函数 ========================
-// 秒转SRT时间格式
-function formatSrtTime(seconds: number): string {
-  const date = new Date(seconds * 1000)
-  const hours = date.getUTCHours().toString().padStart(2, '0')
-  const minutes = date.getUTCMinutes().toString().padStart(2, '0')
-  const secs = date.getUTCSeconds().toString().padStart(2, '0')
-  const ms = date.getUTCMilliseconds().toString().padStart(3, '0')
-  return `${hours}:${minutes}:${secs},${ms}`
-}
-
-// 格式化秒数
-function formatSeconds(seconds: number | null): string {
-  if (seconds == null) return '-'
-  return `${seconds.toFixed(2)}s`
-}
-
-// 参数校验
-function validateParams(): boolean {
-  const errors: string[] = []
-
-  // VAD 参数校验
-  if (transUseVad.value) {
-    if (transVadThreshold.value < 0 || transVadThreshold.value > 1) {
-      errors.push('VAD Speech Threshold 必须在 0-1 之间')
-    }
-    if (transVadMinSpeechMs.value < 0) {
-      errors.push('VAD 最小语音时长不能为负数')
-    }
-    const maxSpeechSec = transVadMaxSpeechSec.value ? Number(transVadMaxSpeechSec.value) : NaN
-    if (!isNaN(maxSpeechSec) && maxSpeechSec < 0) {
-      errors.push('VAD 最大语音时长不能为负数')
-    }
-  }
-
-  // BGM 参数校验
-  if (transUseBgm.value && transBgmSegmentSize.value < 1) {
-    errors.push('BGM Segment Size 必须大于 0')
-  }
-
-  // Whisper 参数校验
-  if (transBeamSize.value < 1) errors.push('Beam Size 必须大于 0')
-  if (transNoSpeechThreshold.value < 0 || transNoSpeechThreshold.value > 1) {
-    errors.push('No Speech 阈值必须在 0-1 之间')
-  }
-
-  if (errors.length > 0) {
-    transError.value = errors.join('；')
-    return false
-  }
-  return true
-}
-
-// 重置转写状态
-function resetTranscriptionState() {
-  transTaskId.value = ''
-  transStatus.value = ''
-  transProgress.value = 0
-  transDuration.value = null
-  transResult.value = []
-  transError.value = ''
-  transLoading.value = false
-  searchResult.value = []
-  keyword.value = ''
-}
-
-// ======================== 核心业务逻辑 ========================
-// 生成字幕内容
+// 生成对应格式的字幕内容（保留原有）
 const transSubtitleContent = computed(() => {
-  if (!Array.isArray(transResult.value) || transResult.value.length === 0) return ''
-
+  if (!Array.isArray(transResult.value) || transResult.value.length === 0) return '';
   switch (transSubtitleFormat.value) {
     case 'SRT':
       return transResult.value.map((seg, idx) => {
@@ -223,11 +117,21 @@ const transSubtitleContent = computed(() => {
     case 'TXT':
       return transResult.value.map(seg => seg.text).join('\n')
     default:
-      return ''
+      return transResult.value.map(seg => seg.text).join('\n')
   }
 })
 
-// 下载字幕文件
+// 辅助：秒转SRT时间格式（保留原有）
+function formatSrtTime(seconds) {
+  const date = new Date(seconds * 1000)
+  const hours = date.getUTCHours().toString().padStart(2, '0')
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0')
+  const secs = date.getUTCSeconds().toString().padStart(2, '0')
+  const ms = date.getUTCMilliseconds().toString().padStart(3, '0')
+  return `${hours}:${minutes}:${secs},${ms}`
+}
+
+// 下载字幕文件（保留原有）
 function downloadSubtitle() {
   if (!transSubtitleContent.value) {
     transError.value = '暂无字幕内容可下载'
@@ -252,27 +156,8 @@ function downloadSubtitle() {
   URL.revokeObjectURL(url)
 }
 
-// 打开输出目录（需后端配合，这里实现前端触发下载目录逻辑）
-async function openOutputDir() {
-  if (!transTaskId.value) {
-    transError.value = '暂无任务输出目录可打开'
-    return
-  }
-  try {
-    // 调用后端接口获取输出目录，或触发客户端打开目录（Electron 环境可用）
-    // 非 Electron 环境可提示用户目录路径
-    if (window.electron) {
-      await window.electron.openDir(transTaskId.value)
-    } else {
-      alert(`输出目录：./output/${transTaskId.value}`)
-    }
-  } catch (e) {
-    transError.value = `打开目录失败：${(e as Error).message}`
-  }
-}
-
-// 关键词查找（防抖处理）
-const handleKeywordSearch = debounce(() => {
+// 关键词查找（保留原有）
+function handleKeywordSearch() {
   if (!keyword.value.trim() || !transResult.value.length) {
     searchResult.value = []
     return
@@ -286,15 +171,14 @@ const handleKeywordSearch = debounce(() => {
       startSrt: formatSrtTime(seg.start),
       endSrt: formatSrtTime(seg.end)
     }))
-}, 300)
+}
 
-// 恢复任务
+// 恢复任务（保留原有）
 async function restoreTranscriptionTask() {
   try {
     const raw = window.localStorage.getItem(LS_TRANS_TASK_KEY)
     if (!raw) return
-
-    const { id } = JSON.parse(raw) as { id: string }
+    const { id } = JSON.parse(raw)
     if (!id) return
 
     transTaskId.value = id
@@ -316,7 +200,7 @@ async function restoreTranscriptionTask() {
     }
 
     const finalStatus = await pollTask(id, {
-      onUpdate(s: TaskStatus) {
+      onUpdate(s) {
         transStatus.value = s.status
         transProgress.value = s.progress ?? 0
       },
@@ -325,25 +209,25 @@ async function restoreTranscriptionTask() {
     transResult.value = finalStatus.result || []
     transDuration.value = finalStatus.duration ?? null
     window.localStorage.removeItem(LS_TRANS_TASK_KEY)
-  } catch (e) {
-    transError.value = `恢复任务失败：${(e as Error).message}`
+  } catch (_) {
     window.localStorage.removeItem(LS_TRANS_TASK_KEY)
   }
 }
 
-// 开始转写
+// 开始转写（保留原有）
 async function handleTranscription() {
   if (!globalFile.value) {
     transError.value = '请先选择要上传的文件'
     return
   }
 
-  // 参数校验
-  if (!validateParams()) return
-
-  resetTranscriptionState()
+  transError.value = ''
   transLoading.value = true
+  transResult.value = []
+  transTaskId.value = ''
   transStatus.value = 'queued'
+  transProgress.value = 0
+  transDuration.value = null
 
   try {
     const whisperParams = {
@@ -422,13 +306,14 @@ async function handleTranscription() {
       vadParams,
       bgmParams,
       diarizationParams,
-    }) as TaskQueue
+    })
 
     transTaskId.value = queue.identifier
+    transStatus.value = queue.status
     window.localStorage.setItem(LS_TRANS_TASK_KEY, JSON.stringify({ id: queue.identifier }))
 
     const finalStatus = await pollTask(queue.identifier, {
-      onUpdate(status: TaskStatus) {
+      onUpdate(status) {
         transStatus.value = status.status
         transProgress.value = status.progress ?? 0
       },
@@ -438,20 +323,23 @@ async function handleTranscription() {
     transDuration.value = finalStatus.duration ?? null
     window.localStorage.removeItem(LS_TRANS_TASK_KEY)
   } catch (e) {
-    transError.value = (e as Error).message || '转写任务执行失败'
+    transError.value = e.message || String(e)
     window.localStorage.removeItem(LS_TRANS_TASK_KEY)
   } finally {
     transLoading.value = false
   }
 }
 
-// ======================== 生命周期 & 监听 ========================
+// 初始化恢复任务（保留原有）
 onMounted(() => {
   restoreTranscriptionTask()
 })
 
-// 监听关键词变化，自动触发搜索（可选）
-watch(keyword, handleKeywordSearch)
+// 辅助：格式化秒数（保留原有）
+function formatSeconds(seconds) {
+  if (seconds == null) return '-'
+  return `${seconds.toFixed(2)}s`
+}
 </script>
 
 <template>
@@ -465,22 +353,12 @@ watch(keyword, handleKeywordSearch)
     <section class="panel input-source-panel">
       <h2>1. 选择输入源</h2>
       <div class="upload-container">
-        <div
-          class="upload-area"
-          @drop="handleDrop"
-          @dragover="handleDragOver"
-          :class="{ 'upload-area--hover': globalFile }"
-        >
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-            <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-            <g id="SVGRepo_iconCarrier">
-              <path d="M7 10V9C7 6.23858 9.23858 4 12 4C14.7614 4 17 6.23858 17 9V10C19.2091 10 21 11.7909 21 14C21 15.4806 20.1956 16.8084 19 17.5M7 10C4.79086 10 3 11.7909 3 14C3 15.4806 3.8044 16.8084 5 17.5M7 10C7.43285 10 7.84965 10.0688 8.24006 10.1959M12 12V21M12 12L15 15M12 12L9 15" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-            </g>
-          </svg>
-          <p>将文件拖放此处<br>或 点击上传</p>
-          <label for="global-file" class="upload-btn">点击上传</label>
-          <input id="global-file" type="file" accept="audio/*,video/*" @change="onGlobalFileChange" class="file-input">
+        <div class="upload-area">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier">
+            <path d="M7 10V9C7 6.23858 9.23858 4 12 4C14.7614 4 17 6.23858 17 9V10C19.2091 10 21 11.7909 21 14C21 15.4806 20.1956 16.8084 19 17.5M7 10C4.79086 10 3 11.7909 3 14C3 15.4806 3.8044 16.8084 5 17.5M7 10C7.43285 10 7.84965 10.0688 8.24006 10.1959M12 12V21M12 12L15 15M12 12L9 15" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path> </g></svg>
+            <p>将文件拖放此处<br>或 点击上传</p>
+            <label for="global-file" class="upload-btn">点击上传</label>
+            <input id="global-file" type="file" accept="audio/*,video/*" @change="onGlobalFileChange" class="file-input">
         </div>
         <p class="selected-file">当前选择: {{ globalFileName }}</p>
       </div>
@@ -756,13 +634,10 @@ watch(keyword, handleKeywordSearch)
         </div>
       </div>
 
-      <!-- 运行 & 重置按钮 -->
+      <!-- 运行按钮 -->
       <div class="actions">
         <button type="button" :disabled="transLoading || !globalFile" @click="handleTranscription" class="run-btn">
           {{ transLoading ? '处理中...' : '开始运行' }}
-        </button>
-        <button type="button" @click="resetTranscriptionState" class="reset-btn" :disabled="transLoading">
-          重置状态
         </button>
       </div>
 
@@ -798,7 +673,7 @@ watch(keyword, handleKeywordSearch)
               >
                 <span class="file-icon">📄</span> 下载
               </button>
-              <button class="open-dir-btn" @click="openOutputDir" :disabled="!transTaskId">
+              <button class="open-dir-btn" :disabled="!transSubtitleContent">
                 打开输出目录
               </button>
             </div>
@@ -826,12 +701,12 @@ watch(keyword, handleKeywordSearch)
                   </select>
                 </label>
               </div>
-              <button type="button" @click="handleKeywordSearch" class="search-btn" :disabled="!transSubtitleContent">
+              <button type="button" @click="handleKeywordSearch" class="search-btn">
                 在字幕中查找
               </button>
             </div>
             <div class="search-result" v-if="searchResult.length">
-              <h4>查找结果 ({{ searchResult.length }})</h4>
+              <h4>查找结果</h4>
               <div class="result-list">
                 <div v-for="(item, idx) in searchResult" :key="idx" class="result-item">
                   <p><strong>时间：</strong>{{ item.startSrt }} --> {{ item.endSrt }}</p>
@@ -912,11 +787,10 @@ watch(keyword, handleKeywordSearch)
   justify-content: center;
   gap: 0.8rem;
   cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition: border-color 0.2s;
 }
-.upload-area--hover {
+.upload-area:hover {
   border-color: #3b82f6;
-  background-color: #f0f7ff;
 }
 .upload-area svg {
   height: 40px;
@@ -1080,8 +954,6 @@ textarea:focus {
 /* 按钮样式 */
 .actions {
   margin-top: 1rem;
-  display: flex;
-  gap: 1rem;
 }
 .run-btn {
   padding: 0.6rem 1.5rem;
@@ -1095,20 +967,6 @@ textarea:focus {
 }
 .run-btn:disabled {
   background-color: #93c5fd;
-  cursor: not-allowed;
-}
-.reset-btn {
-  padding: 0.6rem 1.5rem;
-  background-color: #6b7280;
-  color: white;
-  border: none;
-  border-radius: 0.3rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.reset-btn:disabled {
-  background-color: #9ca3af;
   cursor: not-allowed;
 }
 
@@ -1197,11 +1055,7 @@ textarea:focus {
   cursor: pointer;
   transition: background-color 0.2s;
 }
-.search-btn:disabled {
-  background-color: #fdba74;
-  cursor: not-allowed;
-}
-.search-btn:hover:not(:disabled) {
+.search-btn:hover {
   background-color: #ea580c;
 }
 .search-result {
@@ -1244,13 +1098,6 @@ textarea:focus {
   }
   .form-grid {
     grid-template-columns: 1fr;
-  }
-  .actions {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .upload-area {
-    width: 100%;
   }
 }
 </style>
