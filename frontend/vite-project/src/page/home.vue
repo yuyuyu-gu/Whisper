@@ -78,10 +78,10 @@ const activeTab = ref('transcription')
               <input
                 type="radio"
                 name="tab"
-                value="face"
+                value="graph"
                 v-model="activeTab"
               />
-              <span class="name">人脸搜索</span>
+              <span class="name">图像搜索</span>
             </label>
           </div>
       </div>
@@ -90,9 +90,9 @@ const activeTab = ref('transcription')
       <div class="content">
           <TranscriptionPanel v-if="activeTab === 'transcription'" />
           <VadPanel v-else-if="activeTab === 'vad'" />
-          <BgmPanel v-else-if="activeTab === 'bgm'" />
-          <FaceSearchPanel v-else-if="activeTab === 'face'" />
           <AdminPanel v-else-if="activeTab === 'admin'" />
+          <FaceSearchPanel v-else-if="activeTab === 'graph'" />
+          <BgmPanel v-else />
       </div>
 
     </main>
