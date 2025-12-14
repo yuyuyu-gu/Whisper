@@ -55,14 +55,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="hero">
-    <div class="hero-text">
-      <p class="hero-tag">校史·博物馆·档案馆</p>
-      <h2>音视频档案智能整理平台</h2>
-      <p class="hero-desc">
-        面向高校博物馆与档案馆的数字化方案，支持音视频资料的自动转写、语音分段与背景音乐分离，
-        为校史研究与展陈规划提供更便捷的工具支撑。
-      </p>
-    </div>
     <div class="hero-carousel" @mouseenter="stopCarousel" @mouseleave="startCarousel">
       <div class="carousel-window">
         <div
@@ -96,7 +88,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 12fr) minmax(0, 1.5fr);
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   align-items: center;
@@ -143,7 +135,7 @@ onBeforeUnmount(() => {
 
 .carousel-window {
   position: relative;
-  height: 260px;
+  height: 700px;
 }
 
 .carousel-slide {

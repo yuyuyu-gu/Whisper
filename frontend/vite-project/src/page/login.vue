@@ -28,6 +28,7 @@ const handleRegister = async (e) => {
 // 统一提交逻辑
 const submitForm = async (mode) => {
   error.value = ''
+
   if (!username.value || !password.value) {
     error.value = '请输入用户名和密码'
     return
@@ -41,27 +42,41 @@ const submitForm = async (mode) => {
         username: username.value,
         password: password.value,
       })
-      console.log('登录成功:', data)
-      localStorage.setItem('authToken', data.token || 'dummy-token')
+
+      console.log('login response:', data)
+
+      if (!data.success) {
+        throw new Error(data.message || '用户名或密码错误')
+      }
+
+      // 当前系统没有 JWT，就用 success + role
+      localStorage.setItem('authUser', JSON.stringify({
+        username: username.value,
+        role: data.role,
+      }))
+
       alert('登录成功！')
       router.push('/home')
-    } else {
-      await registerUser({
+    }else {
+      const res = await registerUser({
         username: username.value,
         password: password.value,
       })
-      alert('注册成功，请等待管理员审核。')
-      // 自动切换到登录模式
-      // isLoginMode.value = true
+
+      alert('注册成功，请等待管理员审核')
     }
-    // 清空密码
+
     password.value = ''
   } catch (err) {
-    error.value = err.message?.includes('HTTP') ? `请求失败: ${err.message}` : err.message
+    error.value =
+      err?.response?.data?.detail ||
+      err.message ||
+      '登录失败'
   } finally {
     loading.value = false
   }
 }
+
 </script>
 
 <template>
@@ -157,7 +172,7 @@ const submitForm = async (mode) => {
   justify-content: center;
   align-items: center;
   gap: 5px;
-  width: 120px;
+  width: 220px;
   height: 40px;
   border-radius: 5px;
   border: 2px solid var(--main-color);
@@ -200,7 +215,7 @@ const submitForm = async (mode) => {
 }
 
 .form input {
-  width: 250px;
+  width: 450px;
   height: 40px;
   border-radius: 5px;
   border: 2px solid var(--main-color);
