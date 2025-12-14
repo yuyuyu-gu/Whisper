@@ -6,340 +6,396 @@ import VadPanel from './home/VadPanel.vue'
 import BgmPanel from './home/BgmPanel.vue'
 import AdminPanel from './home/AdminPanel.vue'
 import FaceSearchPanel from './home/FaceSearchPanel.vue'
+import TaskPanel from './home/TaskPanel.vue'
 
 const activeTab = ref('transcription')
+// 新增：控制header收缩状态
+const isCollapsed = ref(false)
 
+// 新增：切换收缩/展开
+const toggleCollapse = () => {
+  isCollapsed.value = !isCollapsed.value
+}
 </script>
 
 <template>
   <div class="app-root">
-    <header class="app-header">
+    <!-- 改造header：添加收缩切换 + 动态内容 -->
+    <header class="app-header" :class="{ collapsed: isCollapsed }">
       <div class="header-left">
-        <img src="/logo.png" alt="logo" class="header-logo" />
+        <img src="/logo.png" alt="西安交通大学校徽" class="header-logo" />
       </div>
       <div class="header-content">
-          <h1>西安交通大学档案馆</h1>
-          <p class="subtitle">Archives of Xi‘an Jiaotong University</p>
-          <p class="subtitle">音视频档案智能整理平台</p>
-          <p class="subtitle">
+        <!-- 核心标题：收缩时简化文字 -->
+        <h1>
+          <span v-if="isCollapsed">西安交通大学档案馆</span>
+          <span v-else>西安交通大学档案馆</span>
+        </h1>
+        <!-- 收缩时隐藏副标题 -->
+        <template v-if="!isCollapsed">
+          <p class="subtitle en-subtitle">Archives of Xi'an Jiaotong University</p>
+          <p class="subtitle main-subtitle">音视频档案智能整理平台</p>
+          <p class="subtitle desc-subtitle">
             面向高校博物馆与档案馆的数字化方案，支持音视频资料的自动转写、语音分段与背景音乐分离，
             为校史研究与展陈规划提供更便捷的工具支撑。
           </p>
+        </template>
       </div>
+      <!-- 新增：收缩/展开切换按钮 -->
+      <button class="collapse-toggle" @click="toggleCollapse" :title="isCollapsed ? '展开' : '收缩'">
+        <i class="toggle-icon">{{ isCollapsed ? '▶' : '◀' }}</i>
+      </button>
     </header>
 
-    <main class="main-layout">
-      <!-- 博物馆风格头图与轮播
-      <HeroSection />-->
-
-      <div class="side-nav">
-          <div class="radio-inputs">
-            <label class="radio">
-              <input
-                type="radio"
-                name="tab"
-                value="transcription"
-                v-model="activeTab"
-              />
-              <span class="name">语音转写</span>
-            </label>
-
-            <label class="radio">
-              <input
-                type="radio"
-                name="tab"
-                value="vad"
-                v-model="activeTab"
-              />
-              <span class="name">VAD 检测</span>
-            </label>
-
-            <label class="radio">
-              <input
-                type="radio"
-                name="tab"
-                value="bgm"
-                v-model="activeTab"
-              />
-              <span class="name">BGM 分离</span>
-            </label>
-
-            <label class="radio">
-              <input
-                type="radio"
-                name="tab"
-                value="admin"
-                v-model="activeTab"
-              />
-              <span class="name">管理页面</span>
-            </label>
-
-            <label class="radio">
-              <input
-                type="radio"
-                name="tab"
-                value="graph"
-                v-model="activeTab"
-              />
-              <span class="name">图像搜索</span>
-            </label>
-          </div>
+    <!-- 顶部导航栏 -->
+    <nav class="top-nav">
+      <div class="nav-items">
+        <label class="nav-item" :class="{ active: activeTab === 'transcription' }">
+          <input type="radio" name="tab" value="transcription" v-model="activeTab" class="nav-radio" />
+          <span class="nav-text">
+            <i class="icon">✍️</i>
+            <span>语音转写</span>
+          </span>
+        </label>
+        <label class="nav-item" :class="{ active: activeTab === 'vad' }">
+          <input type="radio" name="tab" value="vad" v-model="activeTab" class="nav-radio" />
+          <span class="nav-text">
+            <i class="icon">🎤</i>
+            <span>VAD 检测</span>
+          </span>
+        </label>
+        <label class="nav-item" :class="{ active: activeTab === 'bgm' }">
+          <input type="radio" name="tab" value="bgm" v-model="activeTab" class="nav-radio" />
+          <span class="nav-text">
+            <i class="icon">🎵</i>
+            <span>BGM 分离</span>
+          </span>
+        </label>
+        <label class="nav-item" :class="{ active: activeTab === 'admin' }">
+          <input type="radio" name="tab" value="admin" v-model="activeTab" class="nav-radio" />
+          <span class="nav-text">
+            <i class="icon">⚙️</i>
+            <span>管理页面</span>
+          </span>
+        </label>
+        <label class="nav-item" :class="{ active: activeTab === 'graph' }">
+          <input type="radio" name="tab" value="graph" v-model="activeTab" class="nav-radio" />
+          <span class="nav-text">
+            <i class="icon">🔍</i>
+            <span>图像搜索</span>
+          </span>
+        </label>
+        <label class="nav-item" :class="{ active: activeTab === 'task' }">
+          <input type="radio" name="tab" value="task" v-model="activeTab" class="nav-radio" />
+          <span class="nav-text">
+            <i class="icon">🔍</i>
+            <span>后台任务管理</span>
+          </span>
+        </label>
       </div>
+    </nav>
 
-      <!-- 面板 -->
+    <!-- 内容区域 -->
+    <main class="content-area">
       <div class="content">
-          <TranscriptionPanel v-if="activeTab === 'transcription'" />
-          <VadPanel v-else-if="activeTab === 'vad'" />
-          <AdminPanel v-else-if="activeTab === 'admin'" />
-          <FaceSearchPanel v-else-if="activeTab === 'graph'" />
-          <BgmPanel v-else />
+        <TranscriptionPanel v-if="activeTab === 'transcription'" />
+        <VadPanel v-else-if="activeTab === 'vad'" />
+        <AdminPanel v-else-if="activeTab === 'admin'" />
+        <FaceSearchPanel v-else-if="activeTab === 'graph'" />
+        <TaskPanel v-else-if="activeTab === 'task'" />
+        <BgmPanel v-else />
       </div>
-
     </main>
   </div>
 </template>
 
 <style scoped>
+/* 全局样式重置与基础配置 */
+:deep(*) {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 引入思源黑体 */
+@font-face {
+  font-family: 'Source Han Sans';
+  src: local('Source Han Sans CN'),
+       url('https://cdn.bootcdn.net/ajax/libs/source-han-sans/2.004R/OTF/SimplifiedChinese/SourceHanSansCN-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Han Sans';
+  src: local('Source Han Sans CN Bold'),
+       url('https://cdn.bootcdn.net/ajax/libs/source-han-sans/2.004R/OTF/SimplifiedChinese/SourceHanSansCN-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 页面背景：浅米色 */
 .app-root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Source Han Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1f2933;
-  background: #f3f4f6;
+  background: #f5f0e6;
 }
 
+/* 头部：核心修改 - 新增收缩状态样式 + 切换按钮 */
 .app-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-
+  position: static;
   display: flex;
-  align-items: center;   /* 垂直居中 */
-  gap: 16px;             /* 左右间距 */
-  padding: 1.5rem 2rem 1rem;
-  background: #111827;
-  color: #f9fafb;
+  align-items: center;
+  gap: 24px;
+  padding: 2rem 3rem;
+  background: #e6eef5;
+  color: #2d3748;
+  border-bottom: 1px solid #d4c8b8;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  /* 新增：过渡动画 */
+  transition: all 0.3s ease;
+}
+
+/* 新增：收缩状态的header样式 */
+.app-header.collapsed {
+  padding: 0.8rem 2rem;
+  gap: 16px;
 }
 
 .app-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  /* 新增：收缩状态字体缩小 */
+  transition: font-size 0.3s ease;
+}
+
+/* 新增：收缩状态标题字体 */
+.app-header.collapsed h1 {
+  font-size: 1.2rem;
   margin: 0;
-  font-size: 1.5rem;
 }
 
 .header-logo {
-  height: 140px;
+  height: 160px;
   width: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
 }
 
+/* 新增：收缩状态校徽缩小 */
+.app-header.collapsed .header-logo {
+  height: 60px;
+}
+
+.header-logo:hover {
+  transform: scale(1.02);
+}
+
+/* 副标题颜色调整为深灰色系 */
 .subtitle {
-  margin: 0.25rem 0 0.75rem;
-  font-size: 0.9rem;
-  color: #9ca3af;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #4a5568;
+  margin: 4px 0;
+  /* 新增：过渡动画 */
+  transition: opacity 0.2s ease;
 }
 
-.api-base {
+.en-subtitle {
+  font-size: 1rem;
+  color: #718096;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.main-subtitle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.desc-subtitle {
+  max-width: 800px;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+/* 新增：收缩/展开切换按钮样式 */
+.collapse-toggle {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #2d3748;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  /* 确保按钮始终显示 */
+  flex-shrink: 0;
+}
+
+.collapse-toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.toggle-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+/* 顶部导航栏：保持原有样式 */
+.top-nav {
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0.8rem 3rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.nav-items {
   display: flex;
   gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
-.api-base input {
-  width: 260px;
-}
-
-.main-layout {
+.nav-item {
   position: relative;
+  cursor: pointer;
 }
 
-.content {
-  flex: 1;
-  padding: 1.5rem 2rem 2rem;
-  margin-left: 36px;
-  transition: margin-left 0.3s ease;
-}
-
-/* =========================
-   左侧悬浮侧边栏容器
-========================= */
-.side-nav {
-  position: fixed;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1000;
-
-  width: 50px;
-}
-
-.side-nav:hover ~ .content {
-  margin-left: 140px;
-}
-
-/* =========================
-   radio 导航主体
-========================= */
-.radio-inputs {
-  height: 65vh; /* 占满屏幕高度 */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start; /* 或 space-between / center */
-}
-
-.radio-inputs {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-
-  width: 120px;
-  padding: 0.6rem;
-
-  border-radius: 0 1rem 1rem 0;
-  background: linear-gradient(145deg, #e6e6e6, #ffffff);
-
-  box-shadow:
-    5px 5px 15px rgba(0, 0, 0, 0.15),
-    -5px -5px 15px rgba(255, 255, 255, 0.8);
-
-  /* 默认隐藏在左侧 */
-  transform: translateX(-95%);
-  transition: transform 0.3s ease;
-}
-
-/* Hover 展开 */
-.side-nav:hover .radio-inputs {
-  transform: translateX(0);
-}
-
-/* =========================
-   左侧“把手”提示
-========================= */
-.radio-inputs::before {
-  content: "≡";
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-
-  width: 26px;
-  height: 64px;
-
-  background: linear-gradient(145deg, #3b82f6, #2563eb);
-  color: white;
-
-  border-radius: 0 10px 10px 0;
-  font-size: 1.2rem;
-  font-weight: bold;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.25);
-}
-
-/* =========================
-   单个 radio 项
-========================= */
-.radio-inputs .radio {
-  width: 100%;
-  position: relative;
-}
-
-.radio-inputs .radio input {
+.nav-radio {
   display: none;
 }
 
-/* =========================
-   按钮样式
-========================= */
-.radio-inputs .radio .name {
-  display: flex;
+.nav-text {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-
-  cursor: pointer;
-  padding: 0.7rem 0.5rem;
-  border-radius: 0.6rem;
-
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-
-  color: #2d3748;
-  background: linear-gradient(145deg, #ffffff, #e6e6e6);
-
-  box-shadow:
-    3px 3px 6px rgba(0, 0, 0, 0.1),
-    -3px -3px 6px rgba(255, 255, 255, 0.7);
-
+  gap: 8px;
+  padding: 0.7rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  color: #4a89dc;
   transition: all 0.2s ease;
-  overflow: hidden;
 }
 
-/* =========================
-   Hover 效果
-========================= */
-.radio-inputs .radio:hover .name {
-  background: linear-gradient(145deg, #f0f0f0, #ffffff);
-  transform: translateY(-1px);
-  box-shadow:
-    4px 4px 8px rgba(0, 0, 0, 0.1),
-    -4px -4px 8px rgba(255, 255, 255, 0.8);
-}
-
-/* =========================
-   选中状态
-========================= */
-.radio-inputs .radio input:checked + .name {
-  background: linear-gradient(145deg, #3b82f6, #2563eb);
+/* 选中状态：用浅棕红色（适配米色基调）替代原交大蓝，更协调 */
+.nav-item.active .nav-text {
+  background: #2d3748;
   color: #ffffff;
-  font-weight: 600;
-
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-
-  box-shadow:
-    inset 2px 2px 5px rgba(0, 0, 0, 0.2),
-    inset -2px -2px 5px rgba(255, 255, 255, 0.1),
-    3px 3px 8px rgba(59, 130, 246, 0.3);
-
-  transform: translateY(2px);
 }
 
-/* Hover + 选中 */
-.radio-inputs .radio:hover input:checked + .name {
-  transform: translateY(1px);
+/* hover效果：浅米色背景，呼应页面主色调 */
+.nav-item:not(.active):hover .nav-text {
+  background: #f8f2e8;
+  color: #c18a6b;
 }
 
-/* =========================
-   动画
-========================= */
-.radio-inputs .radio input:checked + .name {
-  animation: select 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.icon {
+  font-size: 1rem;
 }
 
-@keyframes select {
-  0% {
-    transform: scale(0.95) translateY(2px);
+/* 内容区域：保持原有样式 */
+.content-area {
+  flex: 1;
+  padding: 2rem 3rem;
+}
+
+.content {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 1.5rem 1.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
-  50% {
-    transform: scale(1.05) translateY(-1px);
+
+  /* 新增：响应式下收缩状态的header */
+  .app-header.collapsed {
+    padding: 1rem 1.5rem;
+    flex-direction: row;
+    align-items: center;
   }
-  100% {
-    transform: scale(1) translateY(2px);
+
+  .header-logo {
+    height: 80px;
   }
-}
 
+  .app-header.collapsed .header-logo {
+    height: 50px;
+  }
 
-.panel {
-}
+  .app-header h1 {
+    font-size: 1.5rem;
+  }
 
-@media (max-width: 640px) {
-  .app-header,
+  .app-header.collapsed h1 {
+    font-size: 1rem;
+  }
+
+  /* 响应式下切换按钮位置调整 */
+  .collapse-toggle {
+    align-self: flex-end;
+    margin-left: 0;
+    margin-top: -40px;
+    margin-bottom: 10px;
+  }
+
+  .app-header.collapsed .collapse-toggle {
+    margin-top: 0;
+    margin-left: auto;
+  }
+
+  .top-nav {
+    padding: 0.8rem 1.5rem;
+    overflow-x: auto;
+  }
+
+  .nav-items {
+    flex-wrap: nowrap;
+  }
+
+  .content-area {
+    padding: 1.5rem 1rem;
+  }
+
   .content {
-    padding: 1rem;
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .app-header.collapsed h1 {
+    font-size: 0.9rem;
+  }
+
+  .desc-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .nav-text {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.85rem;
   }
 }
 </style>
