@@ -121,28 +121,24 @@ onUnmounted(() => {
           <label class="sidebar-item" :class="{ active: activeTab === 'transcription' }">
             <input type="radio" name="tab" value="transcription" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">✍️</i>
               <span class="label-text" v-show="!sidebarCollapsed">语音转写</span>
             </span>
           </label>
           <label class="sidebar-item" :class="{ active: activeTab === 'graph' }">
             <input type="radio" name="tab" value="graph" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">🔍</i>
               <span class="label-text" v-show="!sidebarCollapsed">图像搜索</span>
             </span>
           </label>
           <label class="sidebar-item" :class="{ active: activeTab === 'admin' }">
             <input type="radio" name="tab" value="admin" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">⚙️</i>
               <span class="label-text" v-show="!sidebarCollapsed">管理页面</span>
             </span>
           </label>
           <label class="sidebar-item" :class="{ active: activeTab === 'task' }">
             <input type="radio" name="tab" value="task" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">🔍</i>
               <span class="label-text" v-show="!sidebarCollapsed">后台任务管理</span>
             </span>
           </label>

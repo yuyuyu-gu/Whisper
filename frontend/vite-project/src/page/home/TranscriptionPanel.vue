@@ -9,7 +9,7 @@ import {
   downloadBgmZip
 } from '../../api/backend'
 
-// ======================== 全局统一文件上传 ========================
+// ======================== 文件上传 ========================
 const globalFile = ref(null)
 const globalFileName = ref('Not selected file')
 
@@ -45,7 +45,7 @@ const showWhisperSubpanel = ref(true)
 const keyword = ref('')
 const searchResult = ref([])
 
-// Whisper 高级参数（保留原有）
+// Whisper 高级参数
 const transBeamSize = ref(5)
 const transLogProbThreshold = ref(-1.0)
 const transNoSpeechThreshold = ref(0.6)
@@ -76,21 +76,21 @@ const transLanguageDetectionSegments = ref(1)
 const transBatchSize = ref(24)
 const transEnableOffload = ref(true)
 
-// VAD 参数（整合到高级面板）
+// VAD 参数
 const transVadThreshold = ref(0.5)
 const transVadMinSpeechMs = ref(250)
 const transVadMaxSpeechSec = ref('9999')
 const transVadMinSilenceMs = ref(2000)
 const transVadSpeechPadMs = ref(400)
 
-// BGM 参数（整合到高级面板）
+// BGM 参数
 const transBgmUvrModelSize = ref('UVR-MDX-NET-Inst_HQ_4')
 const transBgmUvrDevice = ref('cuda')
 const transBgmSegmentSize = ref(256)
 const transBgmSaveFile = ref(false)
 const transBgmEnableOffload = ref(true)
 
-// 说话人分离参数（整合到高级面板）
+// 说话人分离参数
 const transDiarizationDevice = ref('cuda')
 const transDiarizationHfToken = ref('')
 const transDiarizationEnableOffload = ref(true)
@@ -104,7 +104,7 @@ const transResult = ref([])
 const transError = ref('')
 const transLoading = ref(false)
 
-// 生成对应格式的字幕内容（保留原有）
+// 生成对应格式的字幕内容
 const transSubtitleContent = computed(() => {
   if (!Array.isArray(transResult.value) || transResult.value.length === 0) return '';
   switch (transSubtitleFormat.value) {
@@ -121,7 +121,6 @@ const transSubtitleContent = computed(() => {
   }
 })
 
-// 辅助：秒转SRT时间格式（保留原有）
 function formatSrtTime(seconds) {
   const date = new Date(seconds * 1000)
   const hours = date.getUTCHours().toString().padStart(2, '0')
@@ -131,7 +130,6 @@ function formatSrtTime(seconds) {
   return `${hours}:${minutes}:${secs},${ms}`
 }
 
-// 下载字幕文件（保留原有）
 function downloadSubtitle() {
   if (!transSubtitleContent.value) {
     transError.value = '暂无字幕内容可下载'
@@ -156,7 +154,6 @@ function downloadSubtitle() {
   URL.revokeObjectURL(url)
 }
 
-// 关键词查找（保留原有）
 function handleKeywordSearch() {
   if (!keyword.value.trim() || !transResult.value.length) {
     searchResult.value = []
@@ -173,7 +170,6 @@ function handleKeywordSearch() {
     }))
 }
 
-// 恢复任务（保留原有）
 async function restoreTranscriptionTask() {
   try {
     const raw = window.localStorage.getItem(LS_TRANS_TASK_KEY)
@@ -214,7 +210,6 @@ async function restoreTranscriptionTask() {
   }
 }
 
-// 开始转写（保留原有）
 async function handleTranscription() {
   if (!globalFile.value) {
     transError.value = '请先选择要上传的文件'
@@ -330,12 +325,10 @@ async function handleTranscription() {
   }
 }
 
-// 初始化恢复任务（保留原有）
 onMounted(() => {
   restoreTranscriptionTask()
 })
 
-// 辅助：格式化秒数（保留原有）
 function formatSeconds(seconds) {
   if (seconds == null) return '-'
   return `${seconds.toFixed(2)}s`
@@ -723,7 +716,6 @@ function formatSeconds(seconds) {
 </template>
 
 <style scoped>
-/* 全局样式 */
 .main-container {
   display: flex;
   flex-direction: column;
@@ -742,7 +734,6 @@ function formatSeconds(seconds) {
   margin-bottom: 0.5rem;
 }
 
-/* 面板通用样式 */
 .panel {
   background: #ffffff;
   border-radius: 0.5rem;
@@ -770,7 +761,6 @@ function formatSeconds(seconds) {
   }
 }
 
-/* 1. 选择输入源样式 */
 .input-source-panel .upload-container {
   display: flex;
   flex-direction: column;
@@ -823,7 +813,6 @@ function formatSeconds(seconds) {
   font-size: 0.9rem;
 }
 
-/* 2. 转录参数面板样式 */
 .param-panel-toggle {
   margin-bottom: 1rem;
 }
@@ -847,7 +836,6 @@ function formatSeconds(seconds) {
   margin-top: 0.5rem;
 }
 
-/* 高级参数样式 */
 .advanced-panel {
   margin-top: 1rem;
   border-top: 1px dashed #eee;
@@ -895,7 +883,6 @@ function formatSeconds(seconds) {
   background-color: #fff;
 }
 
-/* 表单通用样式 */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -936,7 +923,6 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-/* 滑块样式 */
 .slider-group {
   display: flex;
   align-items: center;
@@ -951,7 +937,6 @@ textarea:focus {
   color: #555;
 }
 
-/* 按钮样式 */
 .actions {
   margin-top: 1rem;
 }
@@ -970,7 +955,6 @@ textarea:focus {
   cursor: not-allowed;
 }
 
-/* 状态样式 */
 .status {
   margin-top: 1rem;
   padding: 0.8rem;
@@ -984,7 +968,6 @@ textarea:focus {
   margin: 0.3rem 0 0;
 }
 
-/* 3. 输出面板样式 */
 .output-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;

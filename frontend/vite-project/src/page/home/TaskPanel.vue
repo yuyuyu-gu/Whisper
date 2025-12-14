@@ -1,6 +1,6 @@
 <template>
   <div class="admin-container">
-    <!-- 顶部导航栏（添加panel类） -->
+    <!-- 顶部导航栏 -->
     <header class="admin-header panel">
       <div class="header-content">
         <h1 class="header-title">🎯 任务管理后台</h1>
@@ -22,7 +22,7 @@
       </div>
     </header>
 
-    <!-- 筛选工具栏（添加panel类） -->
+    <!-- 筛选工具栏 -->
     <section class="filter-toolbar panel">
       <div class="filter-group">
         <label class="filter-label">任务类型：</label>
@@ -62,7 +62,7 @@
       </div>
     </section>
 
-    <!-- 任务列表区域（添加panel类） -->
+    <!-- 任务列表区域 -->
     <section class="task-list-container panel">
       <div class="list-header">
         <div class="list-select-all">
@@ -590,7 +590,6 @@ export default {
 </script>
 
 <style scoped>
-/* ========== 新增 panel 样式和 panel-fade-in 动画 ========== */
 .panel {
   background: #ffffff;
   border-radius: 0.75rem;
@@ -615,15 +614,12 @@ export default {
   }
 }
 
-/* ========== 原有样式 ========== */
-/* 基础布局 */
 .admin-container {
   min-height: 100vh;
   background-color: #f8f9fa;
   padding: 1rem 1.25rem;
 }
 
-/* 顶部导航 */
 .admin-header {
   padding: 1rem 1.25rem; /* 微调padding适配panel样式 */
 }
@@ -646,7 +642,6 @@ export default {
   gap: 0.75rem;
 }
 
-/* 筛选工具栏 */
 .filter-toolbar {
   display: flex;
   align-items: center;
@@ -698,7 +693,6 @@ export default {
   cursor: pointer;
 }
 
-/* 任务列表 */
 .task-list-container {
   padding: 1.25rem;
 }
@@ -728,7 +722,6 @@ export default {
   font-weight: 600;
 }
 
-/* 空状态 */
 .empty-state {
   text-align: center;
   padding: 3.75rem 1.25rem;
@@ -740,7 +733,6 @@ export default {
   font-size: 1rem;
 }
 
-/* 加载状态 */
 .loading-state {
   text-align: center;
   padding: 3.75rem 1.25rem;
@@ -768,7 +760,6 @@ export default {
   100% { transform: rotate(360deg); }
 }
 
-/* 任务表格 */
 .task-table {
   width: 100%;
   border-collapse: collapse;
@@ -790,7 +781,6 @@ export default {
   vertical-align: middle;
 }
 
-/* 状态行样式 */
 .status-queued {
   background-color: #fef7fb;
 }
@@ -807,7 +797,6 @@ export default {
   background-color: #fef2f2;
 }
 
-/* 标签样式 */
 .type-tag, .status-tag {
   display: inline-block;
   padding: 0.125rem 0.5rem;
@@ -816,7 +805,6 @@ export default {
   font-weight: 500;
 }
 
-/* 类型标签 */
 .type-transcription {
   background-color: #e8f4f8;
   color: #3182ce;
@@ -832,7 +820,6 @@ export default {
   color: #38b2ac;
 }
 
-/* 状态标签 */
 .tag-queued {
   background-color: #fef7fb;
   color: #ed8936;
@@ -853,7 +840,6 @@ export default {
   color: #e53e3e;
 }
 
-/* 单元格样式 */
 .task-id-cell {
   font-family: monospace;
 }
@@ -883,7 +869,6 @@ export default {
   gap: 0.5rem;
 }
 
-/* 按钮样式 */
 .btn {
   padding: 0.375rem 0.75rem;
   border-radius: 0.375rem;
@@ -963,7 +948,6 @@ export default {
   background-color: #e2e8f0;
 }
 
-/* 分页样式 */
 .pagination-container {
   display: flex;
   justify-content: center;
@@ -1002,7 +986,6 @@ export default {
   color: #718096;
 }
 
-/* 模态框样式 */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1066,7 +1049,6 @@ export default {
   gap: 0.75rem;
 }
 
-/* 详情网格 */
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -1114,7 +1096,6 @@ export default {
   overflow-y: auto;
 }
 
-/* 响应式适配 */
 @media (max-width: 768px) {
   .filter-toolbar {
     flex-direction: column;
@@ -1135,7 +1116,6 @@ export default {
     grid-template-columns: 1fr;
   }
 
-  /* 表格响应式 */
   .task-table {
     display: block;
     overflow-x: auto;
