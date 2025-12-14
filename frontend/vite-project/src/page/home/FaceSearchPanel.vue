@@ -1,15 +1,8 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted } from 'vue'
 
-// ===================== 1. 封装请求工具（替代requestJson） =====================
-/**
- * 通用请求函数
- * @param {string} url - 请求地址
- * @param {object} options - 请求配置
- * @returns {Promise<any>}
- */
 const request = async (url, options = {}) => {
-  const baseUrl = '' // 若接口有前缀（如/api），请在此配置
+  const baseUrl = ''
   const fullUrl = baseUrl + url
 
   try {
@@ -34,12 +27,6 @@ const request = async (url, options = {}) => {
   }
 }
 
-// ===================== 2. 人脸检索接口封装（对接真实接口） =====================
-/**
- * 单张人脸图片入库
- * @param {File} file - 图片文件
- * @returns {Promise<any>}
- */
 const indexFaceImage = async (file) => {
   if (!file) {
     throw new Error('请先选择要上传的人脸图片')
@@ -54,14 +41,6 @@ const indexFaceImage = async (file) => {
   })
 }
 
-/**
- * 使用图片检索相似人脸
- * @param {object} params - 参数
- * @param {File} params.file - 查询图片
- * @param {number} [params.topK=5] - 返回数量
- * @param {number} [params.scoreThreshold=0.8] - 相似度阈值
- * @returns {Promise<any>}
- */
 const searchFaceByImage = async ({ file, topK = 5, scoreThreshold = 0.8 }) => {
   if (!file) {
     throw new Error('请先选择要上传的查询图片')
@@ -78,21 +57,12 @@ const searchFaceByImage = async ({ file, topK = 5, scoreThreshold = 0.8 }) => {
   })
 }
 
-/**
- * 查询人脸库统计信息
- * @returns {Promise<any>}
- */
 const getFaceSearchStats = async () => {
   return request('/face-search/stats', {
     method: 'GET'
   })
 }
 
-/**
- * 清空人脸数据库
- * @param {boolean} confirm - 是否确认
- * @returns {Promise<any>}
- */
 const resetFaceDatabase = async (confirm = true) => {
   return request('/face-search/reset', {
     method: 'POST',
@@ -103,11 +73,6 @@ const resetFaceDatabase = async (confirm = true) => {
   })
 }
 
-/**
- * 删除指定图片对应的人脸记录
- * @param {string[]} imagePaths - 图片路径列表
- * @returns {Promise<any>}
- */
 const deleteFaceImages = async (imagePaths) => {
   if (!Array.isArray(imagePaths) || imagePaths.length === 0) {
     throw new Error('请提供要删除的图片路径列表 imagePaths')
@@ -122,12 +87,11 @@ const deleteFaceImages = async (imagePaths) => {
   })
 }
 
-// ===================== 3. 页面状态管理 =====================
 // 核心业务状态
 const queryFile = ref(null)        // 上传/拍照的文件对象
 const previewImage = ref('')      // 预览图URL
-const topK = ref(5)               // 返回结果数量（默认5）
-const scoreThreshold = ref(0.8)   // 相似度阈值（默认0.8）
+const topK = ref(5)               // 返回结果数量
+const scoreThreshold = ref(0.8)   // 相似度阈值
 const searchResults = ref([])     // 搜索结果列表
 const stats = ref({               // 人脸库统计
   total_faces: 0,
@@ -145,10 +109,6 @@ const canvasRef = ref(null)       // canvas元素引用
 const stream = ref(null)          // 媒体流对象
 const cameraLoading = ref(false)  // 摄像头加载状态
 
-// ===================== 4. 核心功能实现 =====================
-/**
- * 获取人脸库统计信息
- */
 const fetchStats = async () => {
   try {
     const res = await getFaceSearchStats()
@@ -159,9 +119,7 @@ const fetchStats = async () => {
   }
 }
 
-/**
- * 开启摄像头
- */
+
 const openCamera = async () => {
   cameraDialog.value = true
   cameraLoading.value = true
@@ -169,7 +127,7 @@ const openCamera = async () => {
   // 等待弹窗DOM渲染完成
   setTimeout(async () => {
     try {
-      // 申请摄像头权限（仅HTTPS/localhost可用）
+      // 申请摄像头权限
       stream.value = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user', // 优先前置摄像头
@@ -178,7 +136,6 @@ const openCamera = async () => {
         }
       })
 
-      // 将媒体流绑定到video元素
       if (videoRef.value) {
         videoRef.value.srcObject = stream.value
         await videoRef.value.play()
@@ -192,9 +149,6 @@ const openCamera = async () => {
   }, 300)
 }
 
-/**
- * 关闭摄像头
- */
 const closeCamera = () => {
   if (stream.value) {
     // 停止所有媒体轨道，释放摄像头
@@ -205,9 +159,6 @@ const closeCamera = () => {
   cameraDialog.value = false
 }
 
-/**
- * 摄像头拍照
- */
 const takePhoto = () => {
   if (!videoRef.value || !canvasRef.value || cameraLoading.value) return
 
@@ -238,9 +189,6 @@ const takePhoto = () => {
   }, 'image/jpeg', 0.9) // 0.9为图片质量
 }
 
-/**
- * 处理文件上传（input file change事件）
- */
 const handleFileChange = (e) => {
   const file = e.target.files[0]
   if (!file) return
@@ -260,9 +208,6 @@ const handleFileChange = (e) => {
   e.target.value = ''
 }
 
-/**
- * 模拟人脸检测（预览逻辑）
- */
 const handleDetectFace = () => {
   if (!previewImage.value) {
     showMessage('请先上传/拍摄查询图像！', 'warning')
@@ -271,9 +216,6 @@ const handleDetectFace = () => {
   showMessage('已检测到人脸（预览当前图像）', 'info')
 }
 
-/**
- * 执行相似人脸搜索（核心接口调用）
- */
 const handleSearch = async () => {
   if (!queryFile.value) {
     showMessage('请先上传/拍摄查询图像！', 'warning')
@@ -312,9 +254,6 @@ const handleSearch = async () => {
   }
 }
 
-/**
- * 图片入库（管理员功能）
- */
 const handleIndexImage = async () => {
   if (!queryFile.value) {
     showMessage('请先选择要入库的人脸图片！', 'warning')
@@ -341,11 +280,6 @@ const handleIndexImage = async () => {
   }
 }
 
-/**
- * 通用消息提示（原生实现）
- * @param {string} msg - 提示文本
- * @param {string} type - 类型：success/error/warning/info
- */
 const showMessage = (msg, type = 'info') => {
   // 创建提示元素
   const toast = document.createElement('div')

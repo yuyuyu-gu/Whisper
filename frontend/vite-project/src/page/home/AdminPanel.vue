@@ -8,25 +8,19 @@ import {
   revokeAdmin,
 } from '../../api/auth.js'
 
-/* 核心状态 */
 const pendingUsers = ref([])
 const allUsers = ref([])
 const loading = ref(false)
 const error = ref('')
 const successMsg = ref('')
 
-/* 选择器绑定 */
 const selectedPending = ref('') // 待审核用户选择
 const selectedUser = ref('')    // 权限管理用户选择
 
-/* 按钮loading状态（防止重复点击） */
 const approveLoading = ref(false)
 const grantLoading = ref(false)
 const revokeLoading = ref(false)
 
-/**
- * 加载所有用户数据（带loading和错误处理）
- */
 async function loadData() {
   if (loading.value) return
   loading.value = true
@@ -51,7 +45,7 @@ async function loadData() {
 }
 
 /**
- * 审批用户（带loading和状态反馈）
+ * 审批用户
  */
 async function handleApprove(username) {
   if (!username || approveLoading.value) return
@@ -73,7 +67,7 @@ async function handleApprove(username) {
 }
 
 /**
- * 授予管理员权限（移除主账号验证）
+ * 授予管理员权限
  */
 async function handleGrantAdmin(targetUsername) {
   if (grantLoading.value || !targetUsername) return
@@ -95,12 +89,11 @@ async function handleGrantAdmin(targetUsername) {
 }
 
 /**
- * 撤销管理员权限（移除主账号验证）
+ * 撤销管理员权限
  */
 async function handleRevokeAdmin(targetUsername) {
   if (revokeLoading.value || !targetUsername) return
 
-  // 二次确认（危险操作）
   if (!confirm(`确认要撤销 ${targetUsername} 的管理员权限吗？`)) return
 
   revokeLoading.value = true
@@ -119,17 +112,12 @@ async function handleRevokeAdmin(targetUsername) {
   }
 }
 
-/**
- * 关闭提示框（成功/错误）
- */
 function closeAlert(type) {
   if (type === 'success') successMsg.value = ''
   if (type === 'error') error.value = ''
 }
 
-// 页面挂载时加载数据
 onMounted(() => {
-  // 轻微延迟让动画完整展示
   setTimeout(() => {
     loadData()
   }, 100)
@@ -278,7 +266,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 全局容器 */
 .admin-container {
   display: flex;
   flex-direction: column;
@@ -288,7 +275,6 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-/* 面板样式（强化动画层次感） */
 .panel {
   background: #ffffff;
   border-radius: 1rem;
@@ -301,7 +287,6 @@ onMounted(() => {
   transition: all 0.3s ease-in-out;
 }
 
-/* 面板1延迟0.1s，面板2延迟0.25s，形成层次感 */
 .panel-1 {
   animation-delay: 0.1s;
 }
@@ -309,13 +294,11 @@ onMounted(() => {
   animation-delay: 0.25s;
 }
 
-/* 面板hover上浮效果，增强交互丝滑感 */
 .panel:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
 }
 
-/* 面板头部 */
 .panel-header {
   margin-bottom: 1.25rem;
   border-bottom: 1px solid #f5f7fa;
@@ -332,7 +315,6 @@ onMounted(() => {
   color: #1d2129;
 }
 
-/* 提示文本 */
 .subtitle {
   margin: 0.5rem 0 0;
   color: #86909c;
@@ -343,14 +325,12 @@ onMounted(() => {
   animation-delay: calc(inherit + 0.1s);
 }
 
-/* 面板内容 */
 .panel-body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-/* 表单组（逐元素延迟动画，增强层次感） */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -370,7 +350,6 @@ onMounted(() => {
   animation-delay: calc(var(--panel-delay, 0) + 0.5s);
 }
 
-/* 给不同面板的表单元素设置基础延迟变量 */
 .panel-1 .form-group {
   --panel-delay: 0.1s;
 }
@@ -418,7 +397,6 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* 操作按钮组 */
 .action-group {
   display: flex;
   gap: 0.75rem;
@@ -426,7 +404,6 @@ onMounted(() => {
   margin-top: 0.5rem;
 }
 
-/* 按钮样式（强化丝滑交互） */
 .btn {
   padding: 0.625rem 1.25rem;
   border-radius: 0.5rem;
@@ -434,7 +411,6 @@ onMounted(() => {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  /* 更丝滑的过渡曲线 */
   transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   display: inline-flex;
   align-items: center;
@@ -444,7 +420,6 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 按钮点击反馈动画 */
 .btn:not(:disabled):active {
   transform: scale(0.96);
 }
@@ -485,7 +460,6 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* 空状态提示（加动画） */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -512,14 +486,12 @@ onMounted(() => {
   transform: scale(1.05);
 }
 
-/* 提示文本 */
 .hint-text {
   margin: 0;
   font-size: 0.875rem;
   color: #86909c;
 }
 
-/* 全局提示框（更丝滑的动画） */
 .alert {
   padding: 1rem;
   border-radius: 0.5rem;
@@ -566,7 +538,6 @@ onMounted(() => {
   transform: scale(1.1);
 }
 
-/* 动画定义（强化层次感+丝滑度） */
 @keyframes panelFadeIn {
   from {
     opacity: 0;
@@ -609,7 +580,6 @@ onMounted(() => {
   }
 }
 
-/* 响应式适配 */
 @media (max-width: 768px) {
   .admin-container {
     padding: 0.75rem;
