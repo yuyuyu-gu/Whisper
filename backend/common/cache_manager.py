@@ -1,3 +1,5 @@
+"""这个模块提供了一个函数来清理缓存目录中的旧文件。它会检查指定目录中的所有文件，并删除那些最后修改时间超过指定TTL（生存时间）的文件。默认的TTL是60秒。"""
+
 import time
 import os
 from typing import Optional

@@ -1,3 +1,5 @@
+'''这个类提供了一个函数来读取音频文件，可以从上传的文件或者远程URL中读取。它会将音频解码并返回一个numpy数组以及音频的持续时间。'''
+
 from io import BytesIO
 import numpy as np
 import httpx

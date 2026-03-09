@@ -1,3 +1,5 @@
+"""这个模块提供了两个函数：一个用于将多个文件压缩成一个zip文件，另一个用于根据文件内容生成文件的哈希值。它还提供了一个函数来根据哈希值在指定目录中查找文件。"""
+
 import os
 import zipfile
 from typing import List, Optional

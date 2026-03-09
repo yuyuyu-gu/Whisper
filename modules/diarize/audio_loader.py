@@ -1,5 +1,5 @@
+# 这个个模块提供了一个函数来加载音频文件，并将其转换为log-Mel spectrogram格式。它支持从文件路径或numpy数组中加载音频，并使用ffmpeg进行解码和重采样。它还提供了一个函数来计算log-Mel spectrogram，使用预计算的Mel滤波器矩阵来将STFT投影到Mel频率上。
 # Adapted from https://github.com/m-bain/whisperX/blob/main/whisperx/audio.py
-
 import os
 import subprocess
 import shutil

@@ -1,3 +1,4 @@
+# 这个模块提供了一个DiarizationPipeline类，用于执行说话人分离。它使用pyannote.audio库中的预训练模型来对输入音频进行说话人分离，并返回一个包含说话人标签和时间戳的DataFrame。它还提供了一个assign_word_speakers函数，用于将说话人标签分配给转录结果中的每个单词。
 # Adapted from https://github.com/m-bain/whisperX/blob/main/whisperx/diarize.py
 
 import numpy as np

@@ -1,3 +1,4 @@
+# 这个脚本用于列出RAG知识库中的所有文本文件，并打印它们的内容。它接受一个可选的命令行参数--kb_dir，指定知识库目录的路径，默认为KNOWLEDGE_BASE_DIR。它会递归地搜索该目录中的所有.txt文件，并按相对路径排序打印它们的内容。
 import argparse
 import os
 import sys

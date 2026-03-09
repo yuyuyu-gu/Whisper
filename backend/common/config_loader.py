@@ -1,3 +1,5 @@
+"""这个模块提供了两个函数：一个用于加载服务器配置文件，另一个用于读取环境变量。加载服务器配置文件的函数使用了lru_cache装饰器来缓存结果，以提高性能。读取环境变量的函数也使用了lru_cache装饰器，并且在读取环境变量之前会加载指定的dotenv文件。
+配置文件位置："""
 from dotenv import load_dotenv
 import os
 from modules.utils.paths import SERVER_CONFIG_PATH, SERVER_DOTENV_PATH
