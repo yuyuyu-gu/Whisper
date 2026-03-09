@@ -233,6 +233,29 @@ export async function downloadBgmZip(identifier) {
 }
 
 /**
+ * 下载任务结果文件 (通用)
+ * @param {string} identifier 任务ID
+ * @returns {Promise<Blob>} 文件 Blob 数据
+ */
+export async function downloadTaskResult(identifier) {
+  if (!identifier) {
+    throw new Error('缺少任务标识符')
+  }
+
+  const API_BASE = getApiBase()
+  const res = await fetch(`${API_BASE}/task/file/${identifier}`, {
+    method: 'GET'
+  })
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => res.statusText)
+    throw new Error(`下载失败：${res.status} - ${errorText || '未知错误'}`)
+  }
+
+  return res.blob()
+}
+
+/**
  * 批量获取任务列表（分页+筛选）
  * @param {Object} params 筛选和分页参数
  * @returns {Promise<Object>} 任务列表和总数

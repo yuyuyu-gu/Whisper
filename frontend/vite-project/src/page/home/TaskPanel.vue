@@ -165,6 +165,17 @@
               </button>
 
               <button
+                v-if="task.task_type === 'TRANSCRIPTION' && task.status === 'COMPLETED'"
+                class="btn icon-btn download-btn"
+                @click="downloadTaskFile(task.identifier, task.file_name)"
+                title="下载转写结果"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                </svg>
+              </button>
+
+              <button
                 class="btn icon-btn delete-btn"
                 @click="deleteSingleTask(task.identifier)"
                 title="删除任务"
@@ -320,7 +331,8 @@ import {
   getTaskStatus,
   getTaskStatuses,
   deleteTask,
-  downloadBgmZip
+  downloadBgmZip,
+  downloadTaskResult
 } from '../../api/task';
 
 export default {
@@ -473,6 +485,34 @@ export default {
         this.$message?.success('下载开始，请等待');
       } catch (error) {
         console.error('下载BGM文件失败：', error);
+        this.$message?.error(`下载失败：${error.message}`);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // 下载通用任务文件
+    async downloadTaskFile(identifier, fileName) {
+      try {
+        this.loading = true;
+        const blob = await downloadTaskResult(identifier);
+
+        // 创建下载链接
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        // 默认为zip，如果后端返回其他类型，浏览器通常会自动处理，但指定文件名后缀更好
+        a.download = `${fileName || identifier}_result.zip`;
+        document.body.appendChild(a);
+        a.click();
+
+        // 清理
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        this.$message?.success('下载开始，请等待');
+      } catch (error) {
+        console.error('下载文件失败：', error);
         this.$message?.error(`下载失败：${error.message}`);
       } finally {
         this.loading = false;

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../store/user' // 引入Pinia用户仓库
 import TranscriptionPanel from './home/TranscriptionPanel.vue'
+import HeroSection from './home/HeroSection.vue'
 import AdminPanel from './home/AdminPanel.vue'
 import FaceSearchPanel from './home/FaceSearchPanel.vue'
 import TaskPanel from './home/TaskPanel.vue'
@@ -118,31 +119,31 @@ onUnmounted(() => {
         @mouseleave="handleSidebarMouseLeave"
       >
         <div class="sidebar-items">
-          <label class="sidebar-item" :class="{ active: activeTab === 'transcription' }">
+            <label class="sidebar-item" :class="{ active: activeTab === 'transcription' }">
             <input type="radio" name="tab" value="transcription" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">✍️</i>
+              <i class="icon"></i>
               <span class="label-text" v-show="!sidebarCollapsed">语音转写</span>
             </span>
           </label>
-          <label class="sidebar-item" :class="{ active: activeTab === 'graph' }">
+            <label class="sidebar-item" :class="{ active: activeTab === 'graph' }">
             <input type="radio" name="tab" value="graph" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">🔍</i>
+              <i class="icon"></i>
               <span class="label-text" v-show="!sidebarCollapsed">图像搜索</span>
             </span>
           </label>
-          <label class="sidebar-item" :class="{ active: activeTab === 'admin' }">
+            <label class="sidebar-item" :class="{ active: activeTab === 'admin' }">
             <input type="radio" name="tab" value="admin" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">⚙️</i>
+              <i class="icon"></i>
               <span class="label-text" v-show="!sidebarCollapsed">管理页面</span>
             </span>
           </label>
-          <label class="sidebar-item" :class="{ active: activeTab === 'task' }">
+            <label class="sidebar-item" :class="{ active: activeTab === 'task' }">
             <input type="radio" name="tab" value="task" v-model="activeTab" class="sidebar-radio" />
             <span class="sidebar-text">
-              <i class="icon">🔍</i>
+              <i class="icon"></i>
               <span class="label-text" v-show="!sidebarCollapsed">后台任务管理</span>
             </span>
           </label>

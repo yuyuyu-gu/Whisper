@@ -1,91 +1,11 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted } from 'vue'
-
-const request = async (url, options = {}) => {
-  const baseUrl = ''
-  const fullUrl = baseUrl + url
-
-  try {
-    const response = await fetch(fullUrl, {
-      headers: {
-        'Accept': 'application/json',
-        ...(options.headers || {})
-      },
-      ...options
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.message || `请求失败 [${response.status}]`)
-    }
-
-    return data
-  } catch (err) {
-    console.error('请求错误：', err)
-    throw err
-  }
-}
-
-const indexFaceImage = async (file) => {
-  if (!file) {
-    throw new Error('请先选择要上传的人脸图片')
-  }
-
-  const formData = new FormData()
-  formData.append('file', file)
-
-  return request('/face-search/index', {
-    method: 'POST',
-    body: formData
-  })
-}
-
-const searchFaceByImage = async ({ file, topK = 5, scoreThreshold = 0.8 }) => {
-  if (!file) {
-    throw new Error('请先选择要上传的查询图片')
-  }
-
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('top_k', String(topK))
-  formData.append('score_threshold', String(scoreThreshold))
-
-  return request('/face-search/query', {
-    method: 'POST',
-    body: formData
-  })
-}
-
-const getFaceSearchStats = async () => {
-  return request('/face-search/stats', {
-    method: 'GET'
-  })
-}
-
-const resetFaceDatabase = async (confirm = true) => {
-  return request('/face-search/reset', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ confirm })
-  })
-}
-
-const deleteFaceImages = async (imagePaths) => {
-  if (!Array.isArray(imagePaths) || imagePaths.length === 0) {
-    throw new Error('请提供要删除的图片路径列表 imagePaths')
-  }
-
-  return request('/face-search/delete-images', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ image_paths: imagePaths })
-  })
-}
+import { 
+  indexFaceImage, 
+  searchFaceByImage, 
+  getFaceSearchStats, 
+  deleteFaceImages 
+} from '../../api/faceSearch'
 
 // 核心业务状态
 const queryFile = ref(null)        // 上传/拍照的文件对象
@@ -109,13 +29,73 @@ const canvasRef = ref(null)       // canvas元素引用
 const stream = ref(null)          // 媒体流对象
 const cameraLoading = ref(false)  // 摄像头加载状态
 
+const batchInput = ref(null)      // 批量上传Input引用
+
 const fetchStats = async () => {
   try {
     const res = await getFaceSearchStats()
     stats.value = res
-    statusMsg.value = '已获取人脸库统计信息'
+    if (!statusMsg.value) {
+      statusMsg.value = '已获取人脸库统计信息'
+    }
   } catch (err) {
     showMessage(`获取统计失败：${err.message}`, 'error')
+  }
+}
+
+// 批量入库相关
+const handleBatchIndex = () => {
+  if (batchInput.value) {
+    batchInput.value.click()
+  }
+}
+
+const handleBatchFileChange = async (e) => {
+  const files = Array.from(e.target.files)
+  if (files.length === 0) return
+
+  // 重置input，允许重复选择相同文件
+  e.target.value = ''
+
+  if (!confirm(`确认将选中的 ${files.length} 张图片批量入库吗？`)) return
+
+  isLoading.value = true
+  statusMsg.value = `开始批量入库，共 ${files.length} 个文件...`
+  
+  let successCount = 0
+  let failCount = 0
+  const errors = []
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    statusMsg.value = `正在处理 (${i + 1}/${files.length}): ${file.name}`
+    
+    try {
+      const res = await indexFaceImage({ file })
+      if (res.success) {
+        successCount++
+      } else {
+        failCount++
+        errors.push(`${file.name}: ${res.errors?.join(';') || '未知错误'}`)
+      }
+    } catch (err) {
+      failCount++
+      errors.push(`${file.name}: ${err.message}`)
+    }
+  }
+
+  // 更新统计
+  await fetchStats()
+  
+  isLoading.value = false
+  const resultMsg = `批量入库完成！成功: ${successCount}, 失败: ${failCount}`
+  statusMsg.value = resultMsg
+  
+  if (failCount > 0) {
+    console.error('批量入库失败详情：', errors)
+    showMessage(`${resultMsg}。查看控制台获取详情`, 'warning')
+  } else {
+    showMessage(resultMsg, 'success')
   }
 }
 
@@ -266,7 +246,7 @@ const handleIndexImage = async () => {
   statusMsg.value = '正在将图片入库，请稍候...'
 
   try {
-    const res = await indexFaceImage(queryFile.value)
+    const res = await indexFaceImage({ file: queryFile.value })
     statusMsg.value = res.message || '入库操作完成'
     showMessage(res.success ? '入库成功！' : `入库失败：${res.errors?.join('；')}`, res.success ? 'success' : 'error')
 
@@ -418,6 +398,27 @@ onUnmounted(() => {
                 </svg>
                 图片入库
               </button>
+              
+              <button
+                class="btn btn-info"
+                @click="handleBatchIndex"
+                :disabled="isLoading"
+                v-if="isAdmin"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="#fff"/>
+                </svg>
+                批量入库
+              </button>
+              <!-- 隐藏的批量上传Input -->
+              <input
+                type="file"
+                multiple
+                ref="batchInput"
+                accept="image/*"
+                style="display: none"
+                @change="handleBatchFileChange"
+              />
             </div>
           </div>
 
@@ -855,6 +856,15 @@ onUnmounted(() => {
 
 .btn-success:hover:not(:disabled) {
   background-color: #5cb837;
+}
+
+.btn-info {
+  background-color: #909399;
+  color: #fff;
+}
+
+.btn-info:hover:not(:disabled) {
+  background-color: #82848a;
 }
 
 .btn-large {

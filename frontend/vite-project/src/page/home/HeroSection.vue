@@ -92,6 +92,7 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   align-items: center;
+  justify-items: center;
 }
 
 .hero-text {
@@ -131,11 +132,14 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: radial-gradient(circle at top left, #fef3c7, #e5e7eb 40%, #f9fafb 70%);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .carousel-window {
   position: relative;
-  height: 700px;
+  height: 420px;
 }
 
 .carousel-slide {
@@ -234,7 +238,7 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1fr);
   }
   .carousel-window {
-    height: 210px;
+    height: 180px;
   }
 }
 </style>
