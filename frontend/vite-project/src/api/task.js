@@ -138,13 +138,13 @@ export async function getTaskStatus(identifier) {
  * @param {string} identifier 任务ID
  * @param {Object} [options={}] 轮询配置
  * @param {number} [options.intervalMs=2000] 轮询间隔（毫秒）
- * @param {number} [options.maxAttempts=60] 最大轮询次数（超时阈值）
+ * @param {number} [options.maxAttempts=600] 最大轮询次数（超时阈值）
  * @param {Function} [options.onUpdate] 状态更新回调（参数：当前状态）
  * @returns {Promise<Object>} 最终任务状态
  */
 export async function pollTask(identifier, {
   intervalMs = 2000,
-  maxAttempts = 60,
+  maxAttempts = 600,
   onUpdate,
 } = {}) {
   if (!identifier) {

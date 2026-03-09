@@ -11,7 +11,7 @@ from typing import Annotated, Any, BinaryIO, Literal, Generator, Union, Optional
 
 
 class AudioInfo(BaseModel):
-    duration: float
+    duration: float # 音频时长，单位为秒
 
 
 async def read_audio(
